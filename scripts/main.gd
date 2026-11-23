@@ -1,8 +1,8 @@
 extends Node2D
 
-@onready var grid_manager: GridManager = $GridManager
-@onready var ui: UIController = $UI
-@onready var sfx: SfxPlayer = $SfxPlayer
+@onready var grid_manager = $GridManager
+@onready var ui = $UI
+@onready var sfx = $SfxPlayer
 
 var all_towers: Dictionary = {}
 var level_towers: Array = []
