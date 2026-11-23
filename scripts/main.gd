@@ -7,6 +7,7 @@ extends Node3D
 var all_towers: Dictionary = {}
 var level_towers: Array = []
 var selected_tower_id: String = "pulse"
+var inspected_cell := Vector2i(-1, -1)
 
 var current_level_index: int = 1
 var max_levels: int = 20
@@ -28,6 +29,8 @@ func _ready() -> void:
 	grid_manager.level_loaded.connect(_on_level_loaded)
 	grid_manager.tower_place_requested.connect(_on_tower_place_requested)
 	grid_manager.tower_remove_requested.connect(_on_tower_remove_requested)
+	grid_manager.tower_inspected.connect(_on_tower_inspected)
+	grid_manager.tower_inspection_cleared.connect(_on_tower_inspection_cleared)
 	grid_manager.placement_rejected.connect(_on_placement_rejected)
 	grid_manager.enemy_killed.connect(_on_enemy_killed)
 	grid_manager.core_damaged.connect(_on_core_damaged)
@@ -45,6 +48,9 @@ func _ready() -> void:
 	ui.start_wave_requested.connect(_on_start_wave)
 	ui.speed_cycle_requested.connect(_on_cycle_speed)
 	ui.tower_selected.connect(_select_tower)
+	ui.upgrade_inspected_requested.connect(_on_upgrade_inspected)
+	ui.sell_inspected_requested.connect(_on_sell_inspected)
+	ui.close_inspector_requested.connect(func(): grid_manager.clear_inspection())
 	SettingsManager.language_changed.connect(func(_c: String): _refresh_hud())
 
 	_load_level(1)
@@ -71,6 +77,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if ke.keycode == KEY_ESCAPE:
 		if ui.is_any_overlay_open():
 			ui.close_overlays()
+		elif inspected_cell != Vector2i(-1, -1):
+			grid_manager.clear_inspection()
 		else:
 			ui.show_settings()
 		return
@@ -79,6 +87,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 	if ke.keycode == KEY_SPACE:
 		_on_start_wave()
+		return
+
+	if ke.keycode == KEY_U and inspected_cell != Vector2i(-1, -1):
+		_on_upgrade_inspected()
+		return
+	if ke.keycode == KEY_X and inspected_cell != Vector2i(-1, -1):
+		_on_sell_inspected()
 		return
 
 	if int(ke.keycode) >= int(KEY_1) and int(ke.keycode) <= int(KEY_6):
@@ -99,6 +114,8 @@ func _on_overlay_changed(is_open: bool) -> void:
 
 func _load_level(idx: int) -> void:
 	current_level_index = idx
+	inspected_cell = Vector2i(-1, -1)
+	ui.hide_inspector()
 	var path: String = "res://data/levels/level_%02d.json" % idx
 	grid_manager.load_level_from_file(path)
 
@@ -132,6 +149,47 @@ func _select_tower(tid: String) -> void:
 	selected_tower_id = tid
 	grid_manager.set_selected_tower(all_towers[tid])
 	ui.update_shop_state(selected_tower_id, gold)
+
+
+func _on_tower_inspected(cell: Vector2i, info: Dictionary) -> void:
+	inspected_cell = cell
+	ui.show_inspector(info, gold)
+
+
+func _on_tower_inspection_cleared() -> void:
+	inspected_cell = Vector2i(-1, -1)
+	ui.hide_inspector()
+
+
+func _on_upgrade_inspected() -> void:
+	if inspected_cell == Vector2i(-1, -1):
+		return
+	var info: Dictionary = grid_manager.get_inspected_tower_info(inspected_cell)
+	if info.is_empty():
+		return
+	if int(info["level"]) >= int(info["max_level"]):
+		last_msg_key = "msg_max_level"
+		_refresh_hud()
+		return
+	var cost: int = int(info["upgrade_cost"])
+	if gold < cost:
+		last_msg_key = "msg_no_gold"
+		_refresh_hud()
+		return
+	gold -= cost
+	var updated: Dictionary = grid_manager.commit_upgrade_tower(inspected_cell)
+	last_msg_key = "msg_upgraded"
+	ui.show_inspector(updated, gold)
+	_refresh_hud()
+
+
+func _on_sell_inspected() -> void:
+	if inspected_cell == Vector2i(-1, -1):
+		return
+	var info: Dictionary = grid_manager.get_inspected_tower_info(inspected_cell)
+	if info.is_empty():
+		return
+	_on_tower_remove_requested(inspected_cell, int(info["sell_refund"]))
 
 
 func _on_start_wave() -> void:
@@ -186,9 +244,7 @@ func _on_tower_place_requested(cell: Vector2i, on_boost: bool) -> void:
 	_refresh_hud()
 
 
-func _on_tower_remove_requested(cell: Vector2i, tower_id: String) -> void:
-	var cfg: Dictionary = all_towers.get(tower_id, {})
-	var refund: int = int(roundf(float(cfg.get("cost", 25)) * 0.75))
+func _on_tower_remove_requested(cell: Vector2i, refund: int) -> void:
 	gold += refund
 	grid_manager.commit_remove_tower(cell)
 	last_msg_key = "msg_removed"
@@ -202,3 +258,7 @@ func _on_placement_rejected(_cell: Vector2i, reason_key: String) -> void:
 
 func _refresh_hud() -> void:
 	ui.update_hud(level_name, gold, cores, current_wave, total_waves, last_msg_key)
+	if inspected_cell != Vector2i(-1, -1):
+		var info: Dictionary = grid_manager.get_inspected_tower_info(inspected_cell)
+		if not info.is_empty():
+			ui.show_inspector(info, gold)

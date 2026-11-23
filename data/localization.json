@@ -1,12 +1,33 @@
 {
   "languages": [
-    { "code": "en", "name": "English" },
-    { "code": "es", "name": "Español" },
-    { "code": "ru", "name": "Русский" },
-    { "code": "pt", "name": "Português" },
-    { "code": "fr", "name": "Français" },
-    { "code": "de", "name": "Deutsch" },
-    { "code": "it", "name": "Italiano" }
+    {
+      "code": "en",
+      "name": "English"
+    },
+    {
+      "code": "es",
+      "name": "Español"
+    },
+    {
+      "code": "ru",
+      "name": "Русский"
+    },
+    {
+      "code": "pt",
+      "name": "Português"
+    },
+    {
+      "code": "fr",
+      "name": "Français"
+    },
+    {
+      "code": "de",
+      "name": "Deutsch"
+    },
+    {
+      "code": "it",
+      "name": "Italiano"
+    }
   ],
   "strings": {
     "en": {
@@ -74,7 +95,13 @@
       "tile_boost": "Boost Pad — grants +20% damage to tower placed here",
       "tile_tower": "Tower — defends nearby road tiles",
       "guide_controls_title": "4. Controls",
-      "guide_controls_body": "• Keys 1-6 or Bottom Panel: Select tower to build\n• Left Click / Tap: Place selected tower beside the road\n• Right Click: Sell tower (75% credits refund)\n• Space or START WAVE: Launch next enemy wave\n• < / > or [ / ]: Switch between 20 campaign levels\n• Esc: Open Settings & Language menu"
+      "guide_controls_body": "• Keys 1-6 or Bottom Panel: Select tower to build\n• Left Click / Tap: Place selected tower beside the road\n• Right Click: Sell tower (75% credits refund)\n• Space or START WAVE: Launch next enemy wave\n• < / > or [ / ]: Switch between 20 campaign levels\n• Esc: Open Settings & Language menu",
+      "btn_upgrade": "UPGRADE",
+      "btn_sell": "SELL",
+      "lbl_max_level": "MAX LEVEL (OVERDRIVE)",
+      "lbl_lv": "Lv.",
+      "msg_upgraded": "Tower upgraded!",
+      "msg_max_level": "Tower is already at MAX level!"
     },
     "es": {
       "game_title": "NEON GRID DEFENSE",
@@ -141,7 +168,13 @@
       "tile_boost": "Plataforma Boost — +20% de daño a la torre",
       "tile_tower": "Torre — defiende el camino cercano",
       "guide_controls_title": "4. Controles",
-      "guide_controls_body": "• Teclas 1-6 o Panel Inferior: Elegir torre\n• Clic Izquierdo / Toque: Colocar torre\n• Clic Derecho: Vender torre (75% reembolso)\n• Espacio o INICIAR OLEADA: Lanzar oleada\n• < / > o [ / ]: Cambiar entre los 20 niveles\n• Esc: Abrir menú de Ajustes e Idioma"
+      "guide_controls_body": "• Teclas 1-6 o Panel Inferior: Elegir torre\n• Clic Izquierdo / Toque: Colocar torre\n• Clic Derecho: Vender torre (75% reembolso)\n• Espacio o INICIAR OLEADA: Lanzar oleada\n• < / > o [ / ]: Cambiar entre los 20 niveles\n• Esc: Abrir menú de Ajustes e Idioma",
+      "btn_upgrade": "MEJORAR",
+      "btn_sell": "VENDER",
+      "lbl_max_level": "NIVEL MÁX (OVERDRIVE)",
+      "lbl_lv": "Nv.",
+      "msg_upgraded": "¡Torre mejorada!",
+      "msg_max_level": "¡La torre ya está al nivel máximo!"
     },
     "ru": {
       "game_title": "NEON GRID DEFENSE",
@@ -208,7 +241,13 @@
       "tile_boost": "Площадка Boost — даёт башне +20% к урону",
       "tile_tower": "Башня — прикрывает дорогу в своём радиусе",
       "guide_controls_title": "4. Управление",
-      "guide_controls_body": "• Клавиши 1-6 или панель внизу: Выбор башни\n• ЛКМ / Тап: Поставить башню рядом с дорогой\n• ПКМ: Продать башню (возврат 75% цены)\n• Пробел или СТАРТ ВОЛНЫ: Запустить следующую волну\n• < / > или [ / ]: Переключение 20 уровней\n• Esc: Открыть Настройки и выбор языка"
+      "guide_controls_body": "• Клавиши 1-6 или панель внизу: Выбор башни\n• ЛКМ / Тап: Поставить башню рядом с дорогой\n• ПКМ: Продать башню (возврат 75% цены)\n• Пробел или СТАРТ ВОЛНЫ: Запустить следующую волну\n• < / > или [ / ]: Переключение 20 уровней\n• Esc: Открыть Настройки и выбор языка",
+      "btn_upgrade": "АПГРЕЙД",
+      "btn_sell": "ПРОДАТЬ",
+      "lbl_max_level": "МАКС. УРОВЕНЬ (OVERDRIVE)",
+      "lbl_lv": "Ур.",
+      "msg_upgraded": "Башня улучшена!",
+      "msg_max_level": "Башня уже максимального уровня!"
     },
     "pt": {
       "game_title": "NEON GRID DEFENSE",
@@ -275,7 +314,13 @@
       "tile_boost": "Plataforma Boost — +20% de dano para a torre",
       "tile_tower": "Torre — defende a estrada próxima",
       "guide_controls_title": "4. Controles",
-      "guide_controls_body": "• Teclas 1-6 ou Painel Inferior: Escolher torre\n• Clique Esquerdo / Toque: Construir torre\n• Clique Direito: Vender torre (75% reembolso)\n• Espaço ou INICIAR ONDA: Lançar próxima onda\n• < / > ou [ / ]: Alternar entre as 20 fases\n• Esc: Abrir Configurações e Idioma"
+      "guide_controls_body": "• Teclas 1-6 ou Painel Inferior: Escolher torre\n• Clique Esquerdo / Toque: Construir torre\n• Clique Direito: Vender torre (75% reembolso)\n• Espaço ou INICIAR ONDA: Lançar próxima onda\n• < / > ou [ / ]: Alternar entre as 20 fases\n• Esc: Abrir Configurações e Idioma",
+      "btn_upgrade": "MELHORAR",
+      "btn_sell": "VENDER",
+      "lbl_max_level": "NÍVEL MÁX (OVERDRIVE)",
+      "lbl_lv": "Nv.",
+      "msg_upgraded": "Torre melhorada!",
+      "msg_max_level": "A torre já está no nível máximo!"
     },
     "fr": {
       "game_title": "NEON GRID DEFENSE",
@@ -342,7 +387,13 @@
       "tile_boost": "Case Boost — +20% de dégâts pour la tour",
       "tile_tower": "Tour — défend la route à portée",
       "guide_controls_title": "4. Contrôles",
-      "guide_controls_body": "• Touches 1-6 ou Panneau bas : Choisir une tour\n• Clic Gauche / Toucher : Placer la tour\n• Clic Droit : Vendre la tour (75% remboursé)\n• Espace ou LANCER VAGUE : Démarrer la vague\n• < / > ou [ / ] : Changer parmi les 20 niveaux\n• Échap : Ouvrir les Paramètres et la Langue"
+      "guide_controls_body": "• Touches 1-6 ou Panneau bas : Choisir une tour\n• Clic Gauche / Toucher : Placer la tour\n• Clic Droit : Vendre la tour (75% remboursé)\n• Espace ou LANCER VAGUE : Démarrer la vague\n• < / > ou [ / ] : Changer parmi les 20 niveaux\n• Échap : Ouvrir les Paramètres et la Langue",
+      "btn_upgrade": "AMÉLIORER",
+      "btn_sell": "VENDRE",
+      "lbl_max_level": "NIVEAU MAX (OVERDRIVE)",
+      "lbl_lv": "Nv.",
+      "msg_upgraded": "Tour améliorée !",
+      "msg_max_level": "Tour déjà au niveau maximum !"
     },
     "de": {
       "game_title": "NEON GRID DEFENSE",
@@ -409,7 +460,13 @@
       "tile_boost": "Boost-Feld — +20% Schaden für den Turm",
       "tile_tower": "Turm — verteidigt den nahen Weg",
       "guide_controls_title": "4. Steuerung",
-      "guide_controls_body": "• Tasten 1-6 oder Leiste unten: Turm wählen\n• Linksklick / Tippen: Turm platzieren\n• Rechtsklick: Turm verkaufen (75% zurück)\n• Leertaste oder WELLE STARTEN: Welle starten\n• < / > oder [ / ]: Zwischen 20 Leveln wechseln\n• Esc: Einstellungen & Sprache öffnen"
+      "guide_controls_body": "• Tasten 1-6 oder Leiste unten: Turm wählen\n• Linksklick / Tippen: Turm platzieren\n• Rechtsklick: Turm verkaufen (75% zurück)\n• Leertaste oder WELLE STARTEN: Welle starten\n• < / > oder [ / ]: Zwischen 20 Leveln wechseln\n• Esc: Einstellungen & Sprache öffnen",
+      "btn_upgrade": "UPGRADE",
+      "btn_sell": "VERKAUFEN",
+      "lbl_max_level": "MAX-LEVEL (OVERDRIVE)",
+      "lbl_lv": "St.",
+      "msg_upgraded": "Turm verbessert!",
+      "msg_max_level": "Turm ist bereits auf Max-Level!"
     },
     "it": {
       "game_title": "NEON GRID DEFENSE",
@@ -476,7 +533,13 @@
       "tile_boost": "Casella Boost — +20% danni alla torre",
       "tile_tower": "Torre — difende la strada vicina",
       "guide_controls_title": "4. Comandi",
-      "guide_controls_body": "• Tasti 1-6 o Pannello in basso: Scegli torre\n• Clic Sinistro / Tocco: Piazza torre\n• Clic Destro: Vendi torre (75% rimborso)\n• Spazio o AVVIA ONDATA: Avvia prossima ondata\n• < / > o [ / ]: Cambia tra i 20 livelli\n• Esc: Apri Impostazioni e Lingua"
+      "guide_controls_body": "• Tasti 1-6 o Pannello in basso: Scegli torre\n• Clic Sinistro / Tocco: Piazza torre\n• Clic Destro: Vendi torre (75% rimborso)\n• Spazio o AVVIA ONDATA: Avvia prossima ondata\n• < / > o [ / ]: Cambia tra i 20 livelli\n• Esc: Apri Impostazioni e Lingua",
+      "btn_upgrade": "POTENZIA",
+      "btn_sell": "VENDI",
+      "lbl_max_level": "LIVELLO MAX (OVERDRIVE)",
+      "lbl_lv": "Lv.",
+      "msg_upgraded": "Torre potenziata!",
+      "msg_max_level": "La torre è già al livello massimo!"
     }
   }
 }

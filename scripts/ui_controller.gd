@@ -16,6 +16,9 @@ signal prev_level_requested()
 signal next_level_requested()
 signal retry_level_requested()
 signal tower_selected(tower_id: String)
+signal upgrade_inspected_requested()
+signal sell_inspected_requested()
+signal close_inspector_requested()
 signal overlay_visibility_changed(is_open: bool)
 
 var _has_started: bool = false
@@ -43,6 +46,16 @@ var _hud_btn_settings: Button
 var _shop_bar: PanelContainer
 var _shop_title_label: Label
 var _shop_cards_box: HBoxContainer
+
+# Tower Inspector Bar (for 5-level upgrades)
+var _inspector_panel: PanelContainer
+var _insp_icon: TextureRect
+var _insp_title: Label
+var _insp_stats: Label
+var _insp_btn_upgrade: Button
+var _insp_btn_sell: Button
+var _insp_btn_close: Button
+var _insp_info: Dictionary = {}
 
 # Overlays
 var _backdrop: ColorRect
@@ -105,6 +118,7 @@ func _ready() -> void:
 	_current_speed = SettingsManager.default_speed
 	_build_hud()
 	_build_tower_shop()
+	_build_inspector()
 	_build_overlays()
 	SettingsManager.language_changed.connect(_on_language_changed)
 	_apply_translations()
@@ -408,6 +422,115 @@ func _rebuild_tower_shop_cards() -> void:
 		_style_button(btn, col, is_sel, not can_afford)
 		btn.pressed.connect(func(): tower_selected.emit(tid))
 		_shop_cards_box.add_child(btn)
+
+
+func _build_inspector() -> void:
+	_inspector_panel = PanelContainer.new()
+	_inspector_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_inspector_panel.offset_left = -360.0
+	_inspector_panel.offset_right = 360.0
+	_inspector_panel.offset_top = -202.0
+	_inspector_panel.offset_bottom = -130.0
+	_inspector_panel.add_theme_stylebox_override("panel", _make_panel_style(Color("#0F172A"), Color("#FACC15"), 10, 2))
+	_inspector_panel.visible = false
+	add_child(_inspector_panel)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	_inspector_panel.add_child(row)
+
+	_insp_icon = TextureRect.new()
+	_insp_icon.custom_minimum_size = Vector2(46, 46)
+	_insp_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_insp_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	row.add_child(_insp_icon)
+
+	var info_v := VBoxContainer.new()
+	info_v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_v.add_theme_constant_override("separation", 2)
+	row.add_child(info_v)
+
+	_insp_title = Label.new()
+	_insp_title.add_theme_font_size_override("font_size", 14)
+	_insp_title.add_theme_color_override("font_color", Color("#FACC15"))
+	info_v.add_child(_insp_title)
+
+	_insp_stats = Label.new()
+	_insp_stats.add_theme_font_size_override("font_size", 12)
+	_insp_stats.add_theme_color_override("font_color", Color("#E2E8F0"))
+	info_v.add_child(_insp_stats)
+
+	_insp_btn_upgrade = Button.new()
+	_insp_btn_upgrade.custom_minimum_size = Vector2(150, 42)
+	_insp_btn_upgrade.pressed.connect(func(): upgrade_inspected_requested.emit())
+	row.add_child(_insp_btn_upgrade)
+
+	_insp_btn_sell = Button.new()
+	_insp_btn_sell.custom_minimum_size = Vector2(118, 42)
+	_style_button(_insp_btn_sell, Color("#EF4444"), true)
+	_insp_btn_sell.pressed.connect(func(): sell_inspected_requested.emit())
+	row.add_child(_insp_btn_sell)
+
+	_insp_btn_close = Button.new()
+	_insp_btn_close.text = "X"
+	_insp_btn_close.custom_minimum_size = Vector2(32, 32)
+	_style_button(_insp_btn_close, Color("#94A3B8"))
+	_insp_btn_close.pressed.connect(func(): close_inspector_requested.emit())
+	row.add_child(_insp_btn_close)
+
+
+func show_inspector(info: Dictionary, gold: int) -> void:
+	_insp_info = info
+	if not _inspector_panel:
+		return
+	_inspector_panel.visible = true
+	var tid: String = str(info.get("id", "pulse"))
+	var ip: String = "res://assets/sprites/towers/%s.png" % tid
+	if ResourceLoader.exists(ip):
+		_insp_icon.texture = load(ip)
+
+	var lvl: int = int(info.get("level", 1))
+	var max_lvl: int = int(info.get("max_level", 5))
+	var stars: String = ""
+	for k in max_lvl:
+		stars += "*" if k < lvl else "-"
+	var lv_word: String = SettingsManager.tr_key("lbl_lv")
+	_insp_title.text = "%s  |  %s %d/%d [%s]" % [str(info.get("name", tid)), lv_word, lvl, max_lvl, stars]
+
+	var dmg_l: String = SettingsManager.tr_key("stat_dmg")
+	var rng_l: String = SettingsManager.tr_key("stat_rng")
+	var rof_l: String = SettingsManager.tr_key("stat_rof")
+	var cost_l: String = SettingsManager.tr_key("stat_cost")
+
+	if lvl < max_lvl:
+		_insp_stats.text = "%s: %d -> %d  |  %s: %d -> %d  |  %s: %.1f -> %.1f/s" % [
+			dmg_l, int(info["cur_dmg"]), int(info["next_dmg"]),
+			rng_l, int(info["cur_rng"]), int(info["next_rng"]),
+			rof_l, float(info["cur_rof"]), float(info["next_rof"])
+		]
+		var up_cost: int = int(info["upgrade_cost"])
+		var can_aff: bool = gold >= up_cost
+		_insp_btn_upgrade.disabled = not can_aff
+		_insp_btn_upgrade.text = "%s [U]
+%d %s" % [SettingsManager.tr_key("btn_upgrade"), up_cost, cost_l]
+		_style_button(_insp_btn_upgrade, Color("#10B981"), can_aff, not can_aff)
+	else:
+		_insp_stats.text = "%s: %d  |  %s: %d  |  %s: %.1f/s  |  %s" % [
+			dmg_l, int(info["cur_dmg"]), rng_l, int(info["cur_rng"]),
+			rof_l, float(info["cur_rof"]), SettingsManager.tr_key("lbl_max_level")
+		]
+		_insp_btn_upgrade.disabled = true
+		_insp_btn_upgrade.text = "MAX"
+		_style_button(_insp_btn_upgrade, Color("#FACC15"), false, true)
+
+	_insp_btn_sell.text = "%s [X]
++%d %s" % [SettingsManager.tr_key("btn_sell"), int(info["sell_refund"]), cost_l]
+
+
+func hide_inspector() -> void:
+	_insp_info.clear()
+	if _inspector_panel:
+		_inspector_panel.visible = false
 
 
 func _build_overlays() -> void:

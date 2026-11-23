@@ -1,13 +1,14 @@
 extends Node3D
 
-## 3D Изометрический движок Neon Grid Defense v14 (Godot 4.3 GL Compatibility):
-## - 6 стилизованных 3D-башен с раздельной конструкцией (неподвижный пьедестал + поворотная голова на 360°)
-## - Плавное слежение за целью каждый кадр (lerp_angle), отдача стволов и вспышка на срезе ствола
-## - Скруглённые Bezier-траектории на всех поворотах дороги (никаких рывков 90° по клеткам)
-## - 7 упрощённых 3D-врагов с живой процедурной анимацией (шаг ног мехов, поворот башни танка, винты дрона, парение)
+## 3D Изометрический движок Neon Grid Defense v15 (Godot 4.3 GL Compatibility):
+## - 5 уровней апгрейда башен (линейно +20% за уровень: x1.0 / x1.2 / x1.4 / x1.6 / x1.8 + Overdrive на ур. 5)
+## - 3D-эволюция башни (кольца, энерго-стабилизаторы, золотой ореол на ур. 5) + двойное кольцо радиуса при инспекции
+## - 6 поворотных 3D-башен на 360°, скруглённые Bezier-траектории и 7 анимированных 3D-врагов
 
 signal tower_place_requested(cell: Vector2i, on_boost: bool)
-signal tower_remove_requested(cell: Vector2i, tower_id: String)
+signal tower_remove_requested(cell: Vector2i, refund: int)
+signal tower_inspected(cell: Vector2i, info: Dictionary)
+signal tower_inspection_cleared()
 signal placement_rejected(cell: Vector2i, reason_key: String)
 signal level_loaded(level_data: Dictionary)
 signal enemy_killed(bounty: int)
@@ -22,18 +23,21 @@ enum CellType { EMPTY, WALL, PATH, BOOST, SPAWN, CORE, TOWER }
 
 const TILE_SIZE: float = 1.0
 const PX_TO_WORLD: float = 1.0 / 54.0
+const MAX_TOWER_LEVEL: int = 5
+const UPGRADE_COST_MULTS: Array[float] = [0.0, 0.75, 1.10, 1.60, 2.20]
 
 var grid_size := Vector2i(24, 14)
 var current_level_data: Dictionary = {}
 var spawns: Array[Vector2i] = []
 var core_cell := Vector2i(23, 6)
-var fixed_paths: Array = []   # Array of Array[Vector2i]
-var smooth_paths: Array = []  # Array of PackedVector3Array (скруглённые Bezier-маршруты)
+var fixed_paths: Array = []
+var smooth_paths: Array = []
 var walls: Array[Vector2i] = []
 var boost_tiles: Array[Vector2i] = []
 
 var input_enabled: bool = false
 var selected_tower_config: Dictionary = {}
+var inspected_cell := Vector2i(-1, -1)
 var game_speed: float = 1.0
 var cores_remaining: int = 10
 
@@ -55,6 +59,8 @@ var _hover_box: MeshInstance3D
 var _hover_mat: StandardMaterial3D
 var _range_ring: MeshInstance3D
 var _range_mat: StandardMaterial3D
+var _next_range_ring: MeshInstance3D
+var _next_range_mat: StandardMaterial3D
 var _core_sphere: MeshInstance3D
 var _core_ring_a: MeshInstance3D
 var _core_ring_b: MeshInstance3D
@@ -156,15 +162,27 @@ func _setup_containers() -> void:
 
 	_range_ring = MeshInstance3D.new()
 	var rmesh := TorusMesh.new()
-	rmesh.inner_radius = 0.95
+	rmesh.inner_radius = 0.96
 	rmesh.outer_radius = 1.0
 	rmesh.rings = 48
 	rmesh.ring_segments = 8
 	_range_ring.mesh = rmesh
-	_range_mat = _make_mat(Color("#00E5FF"), 2.0, 0.72)
+	_range_mat = _make_mat(Color("#00E5FF"), 2.0, 0.75)
 	_range_ring.material_override = _range_mat
 	_range_ring.visible = false
 	add_child(_range_ring)
+
+	_next_range_ring = MeshInstance3D.new()
+	var nrmesh := TorusMesh.new()
+	nrmesh.inner_radius = 0.97
+	nrmesh.outer_radius = 1.0
+	nrmesh.rings = 48
+	nrmesh.ring_segments = 8
+	_next_range_ring.mesh = nrmesh
+	_next_range_mat = _make_mat(Color("#FACC15"), 2.0, 0.45)
+	_next_range_ring.material_override = _next_range_mat
+	_next_range_ring.visible = false
+	add_child(_next_range_ring)
 
 
 func _update_camera_fit() -> void:
@@ -189,11 +207,147 @@ func _on_settings_changed() -> void:
 
 func set_selected_tower(tower_cfg: Dictionary) -> void:
 	selected_tower_config = tower_cfg
+	clear_inspection()
 	_update_hover_visuals()
+
+
+func clear_inspection() -> void:
+	if inspected_cell != Vector2i(-1, -1):
+		inspected_cell = Vector2i(-1, -1)
+		_next_range_ring.visible = false
+		_update_hover_visuals()
+		tower_inspection_cleared.emit()
 
 
 func is_wave_active() -> bool:
 	return _wave_active
+
+
+func get_stat_mult(lvl: int) -> float:
+	# Линейная прогрессия: +20% от базы за каждый уровень (1.0, 1.2, 1.4, 1.6, 1.8)
+	return 1.0 + float(clampi(lvl, 1, MAX_TOWER_LEVEL) - 1) * 0.20
+
+
+func get_upgrade_cost(t: Dictionary) -> int:
+	var lvl: int = int(t.get("level", 1))
+	if lvl >= MAX_TOWER_LEVEL:
+		return 0
+	var base_cost: float = float(t.get("base_cost", 25))
+	return int(roundf(base_cost * UPGRADE_COST_MULTS[lvl]))
+
+
+func get_sell_refund(t: Dictionary) -> int:
+	return int(roundf(float(t.get("total_invested", 25)) * 0.75))
+
+
+func get_inspected_tower_info(cell: Vector2i) -> Dictionary:
+	if not _placed_towers.has(cell):
+		return {}
+	var t: Dictionary = _placed_towers[cell]
+	var lvl: int = int(t["level"])
+	var boost_m: float = 1.2 if _boost_set.has(cell) else 1.0
+	var cur_mult: float = get_stat_mult(lvl)
+	var next_mult: float = get_stat_mult(min(lvl + 1, MAX_TOWER_LEVEL))
+	return {
+		"cell": cell,
+		"id": str(t["id"]),
+		"name": str(t["name"]),
+		"color": str(t["color"]),
+		"level": lvl,
+		"max_level": MAX_TOWER_LEVEL,
+		"upgrade_cost": get_upgrade_cost(t),
+		"sell_refund": get_sell_refund(t),
+		"cur_dmg": int(roundf(float(t["base_damage"]) * cur_mult * boost_m)),
+		"next_dmg": int(roundf(float(t["base_damage"]) * next_mult * boost_m)),
+		"cur_rng": int(roundf(float(t["base_range"]) * cur_mult)),
+		"next_rng": int(roundf(float(t["base_range"]) * next_mult)),
+		"cur_rof": float(t["base_fire_rate"]) * cur_mult,
+		"next_rof": float(t["base_fire_rate"]) * next_mult
+	}
+
+
+func commit_upgrade_tower(cell: Vector2i) -> Dictionary:
+	if not _placed_towers.has(cell):
+		return {}
+	var t: Dictionary = _placed_towers[cell]
+	var lvl: int = int(t["level"])
+	if lvl >= MAX_TOWER_LEVEL:
+		return {}
+
+	var cost: int = get_upgrade_cost(t)
+	lvl += 1
+	t["level"] = lvl
+	t["total_invested"] = int(t["total_invested"]) + cost
+
+	var mult: float = get_stat_mult(lvl)
+	t["damage"] = float(t["base_damage"]) * mult
+	t["range"] = float(t["base_range"]) * mult
+	t["fire_rate"] = float(t["base_fire_rate"]) * mult
+	t["aoe_radius"] = float(t["base_aoe_radius"]) * mult
+	t["slow_factor"] = minf(0.65, float(t["base_slow_factor"]) + (0.15 if lvl == MAX_TOWER_LEVEL else float(lvl - 1) * 0.03))
+	t["chain_count"] = int(t["base_chain_count"]) + (2 if lvl == MAX_TOWER_LEVEL else (1 if lvl >= 3 else 0))
+
+	_apply_tower_upgrade_visuals(cell, t)
+	var pos: Vector3 = cell_to_world_3d(cell)
+	_spawn_ring_vfx(pos, 1.35, Color("#FACC15") if lvl == MAX_TOWER_LEVEL else Color("#00E5FF"), 0.32)
+	sfx_requested.emit("upgrade")
+	_update_hover_visuals()
+	return get_inspected_tower_info(cell)
+
+
+func _apply_tower_upgrade_visuals(cell: Vector2i, t: Dictionary) -> void:
+	var lvl: int = int(t["level"])
+	var head: Node3D = t.get("head", null)
+	var rank_group: Node3D = t.get("rank_group", null)
+	var lbl: Label3D = t.get("level_label", null)
+	var col := Color(str(t.get("color", "#00E5FF")))
+	var ring_col: Color = Color("#FACC15") if lvl == MAX_TOWER_LEVEL else col
+
+	if is_instance_valid(head):
+		var sc: float = 1.0 + float(lvl - 1) * 0.045
+		head.scale = Vector3(sc, sc, sc)
+
+	if is_instance_valid(rank_group):
+		_clear_node_children(rank_group)
+		var rmat := _make_mat(ring_col, 2.8 if lvl == MAX_TOWER_LEVEL else 2.2, 1.0, 0.2, 0.2)
+		# Кольца эволюции на пьедестале (уровень 2..5)
+		if lvl >= 2:
+			var r2 := MeshInstance3D.new()
+			var tm2 := TorusMesh.new()
+			tm2.inner_radius = 0.30
+			tm2.outer_radius = 0.34
+			tm2.rings = 16
+			r2.mesh = tm2
+			r2.position.y = 0.26
+			r2.material_override = rmat
+			rank_group.add_child(r2)
+		if lvl >= 3:
+			var r3 := MeshInstance3D.new()
+			var tm3 := TorusMesh.new()
+			tm3.inner_radius = 0.40
+			tm3.outer_radius = 0.44
+			tm3.rings = 16
+			r3.mesh = tm3
+			r3.position.y = 0.06
+			r3.material_override = rmat
+			rank_group.add_child(r3)
+		if lvl >= 4:
+			# 4 боковых неоновых стабилизатора вокруг пьедестала
+			var fin_mat := _make_mat(ring_col, 2.4, 1.0, 0.4, 0.2)
+			for ang_deg in [45.0, 135.0, 225.0, 315.0]:
+				var rad: float = deg_to_rad(ang_deg)
+				var fin := MeshInstance3D.new()
+				var bm := BoxMesh.new()
+				bm.size = Vector3(0.08, 0.26, 0.08)
+				fin.mesh = bm
+				fin.position = Vector3(cos(rad) * 0.38, 0.22, sin(rad) * 0.38)
+				fin.material_override = fin_mat
+				rank_group.add_child(fin)
+
+	if is_instance_valid(lbl):
+		lbl.visible = lvl >= 2
+		lbl.text = "MAX" if lvl == MAX_TOWER_LEVEL else ("L%d" % lvl)
+		lbl.modulate = Color("#FACC15") if lvl == MAX_TOWER_LEVEL else Color("#E2E8F0")
 
 
 func _make_mat(col: Color, emission_strength: float = 0.0, alpha: float = 1.0, metallic: float = 0.50, roughness: float = 0.36) -> StandardMaterial3D:
@@ -246,8 +400,10 @@ func load_level_from_file(path: String) -> bool:
 		smooth_paths.append(_build_smooth_bezier_path(cell_arr))
 
 	_hover_cell = Vector2i(-1, -1)
+	inspected_cell = Vector2i(-1, -1)
 	_hover_box.visible = false
 	_range_ring.visible = false
+	_next_range_ring.visible = false
 	_placed_towers.clear()
 	_enemies.clear()
 	_projectiles.clear()
@@ -269,7 +425,6 @@ func load_level_from_file(path: String) -> bool:
 	return true
 
 
-## Преобразует ломаную из клеток сетки в плавную кривую с закруглёнными поворотами (квадратичный Безье).
 func _build_smooth_bezier_path(cell_path: Array[Vector2i]) -> PackedVector3Array:
 	var out := PackedVector3Array()
 	if cell_path.size() < 2:
@@ -277,7 +432,6 @@ func _build_smooth_bezier_path(cell_path: Array[Vector2i]) -> PackedVector3Array
 			out.append(cell_to_world_3d(c))
 		return out
 
-	# Сначала оставляем только угловые точки (старт, повороты, финиш)
 	var corners: Array[Vector3] = [cell_to_world_3d(cell_path[0])]
 	for i in range(1, cell_path.size() - 1):
 		var d1: Vector2i = cell_path[i] - cell_path[i - 1]
@@ -567,6 +721,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		var cell: Vector2i = _raycast_mouse_to_cell(mb.position)
 		if not _cells.has(cell):
+			clear_inspection()
 			return
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			_handle_left_click(cell)
@@ -575,7 +730,41 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _update_hover_visuals() -> void:
-	if not input_enabled or not _cells.has(_hover_cell):
+	if not input_enabled:
+		_hover_box.visible = false
+		_range_ring.visible = false
+		_next_range_ring.visible = false
+		return
+
+	# Если выбрана уже стоящая башня для инспекции/апгрейда — показываем её радиус и будущий радиус (+20%)
+	if _placed_towers.has(inspected_cell):
+		var t: Dictionary = _placed_towers[inspected_cell]
+		var ipos: Vector3 = cell_to_world_3d(inspected_cell)
+		var cur_r: float = float(t["range"]) * PX_TO_WORLD
+		var tcol := Color(str(t.get("color", "#00E5FF")))
+		_hover_box.visible = true
+		_hover_box.position = Vector3(ipos.x, 0.06, ipos.z)
+		_hover_mat.albedo_color = Color(1.0, 0.85, 0.15, 0.35)
+		_hover_mat.emission = Color("#FACC15")
+
+		_range_ring.visible = true
+		_range_ring.position = Vector3(ipos.x, 0.08, ipos.z)
+		_range_ring.scale = Vector3(cur_r, 1.0, cur_r)
+		_range_mat.albedo_color = Color(tcol.r, tcol.g, tcol.b, 0.72)
+		_range_mat.emission = tcol
+
+		var lvl: int = int(t["level"])
+		if lvl < MAX_TOWER_LEVEL:
+			var next_r: float = float(t["base_range"]) * get_stat_mult(lvl + 1) * PX_TO_WORLD
+			_next_range_ring.visible = true
+			_next_range_ring.position = Vector3(ipos.x, 0.09, ipos.z)
+			_next_range_ring.scale = Vector3(next_r, 1.0, next_r)
+		else:
+			_next_range_ring.visible = false
+		return
+
+	_next_range_ring.visible = false
+	if not _cells.has(_hover_cell):
 		_hover_box.visible = false
 		_range_ring.visible = false
 		return
@@ -583,7 +772,8 @@ func _update_hover_visuals() -> void:
 	var pos: Vector3 = cell_to_world_3d(_hover_cell)
 	_hover_box.visible = true
 	_hover_box.position = Vector3(pos.x, 0.06, pos.z)
-	var hcol := Color("#00E5FF") if _can_place_hover else Color("#FF3B5C")
+	var is_tower: bool = int(_cells.get(_hover_cell, -1)) == CellType.TOWER
+	var hcol := Color("#FACC15") if is_tower else (Color("#00E5FF") if _can_place_hover else Color("#FF3B5C"))
 	_hover_mat.albedo_color = Color(hcol.r, hcol.g, hcol.b, 0.35)
 	_hover_mat.emission = hcol
 
@@ -606,6 +796,16 @@ func _is_buildable_cell(cell: Vector2i) -> bool:
 
 func _handle_left_click(cell: Vector2i) -> void:
 	var t: int = int(_cells.get(cell, -1))
+	# Клик по уже стоящей башне открывает инспектор апгрейда
+	if t == CellType.TOWER and _placed_towers.has(cell):
+		inspected_cell = cell
+		_update_hover_visuals()
+		tower_inspected.emit(cell, get_inspected_tower_info(cell))
+		return
+
+	if inspected_cell != Vector2i(-1, -1):
+		clear_inspection()
+
 	if t == CellType.PATH or t == CellType.SPAWN or t == CellType.CORE:
 		placement_rejected.emit(cell, "msg_on_road")
 		return
@@ -617,9 +817,11 @@ func _handle_left_click(cell: Vector2i) -> void:
 
 func _handle_right_click(cell: Vector2i) -> void:
 	if int(_cells.get(cell, -1)) != CellType.TOWER:
+		clear_inspection()
 		return
-	var cfg: Dictionary = _placed_towers.get(cell, {})
-	tower_remove_requested.emit(cell, str(cfg.get("id", "pulse")))
+	var t: Dictionary = _placed_towers.get(cell, {})
+	var refund: int = get_sell_refund(t)
+	tower_remove_requested.emit(cell, refund)
 
 
 func commit_place_tower(cell: Vector2i, tower_cfg: Dictionary) -> void:
@@ -631,7 +833,17 @@ func commit_place_tower(cell: Vector2i, tower_cfg: Dictionary) -> void:
 	root_node.position = cell_to_world_3d(cell)
 	_towers_root.add_child(root_node)
 
+	var base_cost: int = int(tower_cfg.get("cost", 25))
 	var runtime_cfg: Dictionary = tower_cfg.duplicate()
+	runtime_cfg["level"] = 1
+	runtime_cfg["base_cost"] = base_cost
+	runtime_cfg["total_invested"] = base_cost
+	runtime_cfg["base_damage"] = float(tower_cfg.get("damage", 12.0))
+	runtime_cfg["base_range"] = float(tower_cfg.get("range", 180.0))
+	runtime_cfg["base_fire_rate"] = float(tower_cfg.get("fire_rate", 1.0))
+	runtime_cfg["base_aoe_radius"] = float(tower_cfg.get("aoe_radius", 72.0))
+	runtime_cfg["base_slow_factor"] = float(tower_cfg.get("slow_factor", 0.4))
+	runtime_cfg["base_chain_count"] = int(tower_cfg.get("chain_count", 3))
 	runtime_cfg["cooldown"] = 0.0
 	runtime_cfg["recoil"] = 0.0
 	runtime_cfg["yaw"] = 0.0
@@ -639,6 +851,8 @@ func commit_place_tower(cell: Vector2i, tower_cfg: Dictionary) -> void:
 	runtime_cfg["head"] = built["head"]
 	runtime_cfg["barrel_group"] = built["barrel_group"]
 	runtime_cfg["muzzle"] = built["muzzle"]
+	runtime_cfg["rank_group"] = built["rank_group"]
+	runtime_cfg["level_label"] = built["level_label"]
 	_placed_towers[cell] = runtime_cfg
 	_can_place_hover = false
 	_update_hover_visuals()
@@ -651,13 +865,14 @@ func commit_remove_tower(cell: Vector2i) -> void:
 		if is_instance_valid(n):
 			n.queue_free()
 		_placed_towers.erase(cell)
+	if inspected_cell == cell:
+		clear_inspection()
 	_cells[cell] = CellType.BOOST if _boost_set.has(cell) else CellType.EMPTY
 	_can_place_hover = _is_buildable_cell(_hover_cell)
 	_update_hover_visuals()
 	sfx_requested.emit("sell")
 
 
-## Строит стилизованную 3D-башню с неподвижным пьедесталом, поворотной головой на 360° и точкой ствола (muzzle).
 func _build_rotating_tower(tid: String, col: Color, on_boost: bool) -> Dictionary:
 	var root := Node3D.new()
 	var dark_mat := _make_mat(Color("#152033"), 0.0, 1.0, 0.72, 0.35)
@@ -665,7 +880,6 @@ func _build_rotating_tower(tid: String, col: Color, on_boost: bool) -> Dictionar
 	var accent_mat := _make_mat(col, 0.35, 1.0, 0.62, 0.28)
 	var glow_mat := _make_mat(col, 2.8, 1.0, 0.15, 0.15)
 
-	# 1. Неподвижный восьмиугольный пьедестал + неоновое кольцо
 	var ped := MeshInstance3D.new()
 	var pm := CylinderMesh.new()
 	pm.top_radius = 0.38
@@ -698,7 +912,19 @@ func _build_rotating_tower(tid: String, col: Color, on_boost: bool) -> Dictionar
 	base_ring.material_override = _make_mat(Color("#10B981") if on_boost else col, 2.2, 1.0, 0.2, 0.2)
 	root.add_child(base_ring)
 
-	# 2. Поворотная голова (вращается на 360° по Y вслед за врагом; локальный +Z — направление ствола)
+	var rank_group := Node3D.new()
+	root.add_child(rank_group)
+
+	var level_label := Label3D.new()
+	level_label.text = ""
+	level_label.font_size = 24
+	level_label.pixel_size = 0.011
+	level_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	level_label.outline_size = 4
+	level_label.position = Vector3(0.0, 1.22, 0.0)
+	level_label.visible = false
+	root.add_child(level_label)
+
 	var head := Node3D.new()
 	head.position.y = 0.36
 	root.add_child(head)
@@ -865,7 +1091,10 @@ func _build_rotating_tower(tid: String, col: Color, on_boost: bool) -> Dictionar
 			barrel_group.add_child(energy)
 			muzzle.position = Vector3(0.0, 0.12, 0.78)
 
-	return {"root": root, "head": head, "barrel_group": barrel_group, "muzzle": muzzle}
+	return {
+		"root": root, "head": head, "barrel_group": barrel_group,
+		"muzzle": muzzle, "rank_group": rank_group, "level_label": level_label
+	}
 
 
 func start_next_wave() -> bool:
@@ -925,7 +1154,6 @@ func _process(delta: float) -> void:
 				_core_light.light_color = c
 
 	var dt: float = delta * game_speed
-	# Анимация башен (кристалл Cryo и плавный возврат отдачи) работает всегда
 	_animate_idle_towers(dt)
 
 	if _wave_active and not _ended:
@@ -995,7 +1223,6 @@ func _spawn_enemy(item: Dictionary) -> void:
 	})
 
 
-## Строит упрощённого 3D-врага с подвижными частями для естественной анимации ходьбы/полёта.
 func _build_animated_enemy(eid: String, elite: bool, has_shield: bool) -> Dictionary:
 	var root := Node3D.new()
 	var body_pivot := Node3D.new()
@@ -1311,7 +1538,6 @@ func _process_enemies(dt: float) -> void:
 			e["yaw"] = new_yaw
 			node.rotation.y = new_yaw
 
-			# Процедурная анимация частей каждого архетипа
 			var parts: Dictionary = e["parts"]
 			var pivot: Node3D = parts["pivot"]
 			pivot.rotation.z = clampf(-turn_delta * 2.5, -0.22, 0.22)
@@ -1372,7 +1598,6 @@ func _process_towers(dt: float) -> void:
 		var rng: float = float(t.get("range", 180.0)) * PX_TO_WORLD
 		var target_idx: int = _find_target_index(t_pos, rng)
 
-		# Плавное постоянное наведение башни на цель КАЖДЫЙ КАДР (даже во время перезарядки!)
 		if target_idx >= 0 and is_instance_valid(head) and tid != "cryo" and tid != "tesla":
 			var ep: Vector3 = _enemies[target_idx]["pos"]
 			var desired_yaw: float = atan2(ep.x - t_pos.x, ep.z - t_pos.z)
@@ -1389,9 +1614,15 @@ func _process_towers(dt: float) -> void:
 		t["cooldown"] = 1.0 / fire_rate
 		t["recoil"] = 1.0
 		var dmg: float = float(t.get("damage", 12.0)) * (1.2 if _boost_set.has(cell) else 1.0)
+		var is_crit: bool = false
+		# Бонус Overdrive на ур. 5: +25% шанс крита x1.6 для Pulse, Laser и Railgun
+		if int(t["level"]) >= MAX_TOWER_LEVEL and (tid == "pulse" or tid == "laser" or tid == "railgun"):
+			if randf() < 0.25:
+				dmg *= 1.6
+				is_crit = true
 		var fire_origin: Vector3 = muzzle.global_position if is_instance_valid(muzzle) else t_pos
 
-		_fire_tower(tid, t, fire_origin, target_idx, dmg)
+		_fire_tower(tid, t, fire_origin, target_idx, dmg, is_crit)
 
 
 func _find_target_index(origin: Vector3, rng: float) -> int:
@@ -1408,21 +1639,20 @@ func _find_target_index(origin: Vector3, rng: float) -> int:
 	return best_idx
 
 
-func _fire_tower(tid: String, cfg: Dictionary, origin: Vector3, target_idx: int, dmg: float) -> void:
+func _fire_tower(tid: String, cfg: Dictionary, origin: Vector3, target_idx: int, dmg: float, is_crit: bool) -> void:
 	var target: Dictionary = _enemies[target_idx]
 	var t_pos: Vector3 = (target["pos"] as Vector3) + Vector3(0.0, 0.30, 0.0)
-	var col := Color(str(cfg.get("color", "#00E5FF")))
+	var col := Color("#FACC15") if is_crit else Color(str(cfg.get("color", "#00E5FF")))
 
-	# Вспышка на срезе ствола
 	_spawn_muzzle_flash(origin, col)
 
 	match tid:
 		"pulse":
 			sfx_requested.emit("pulse")
-			_spawn_projectile(origin, t_pos, 12.0, dmg, "kinetic", 0.0, col)
+			_spawn_projectile(origin, t_pos, 12.0, dmg, "kinetic", 0.0, col, is_crit)
 		"cannon":
 			sfx_requested.emit("cannon")
-			_spawn_projectile(origin, t_pos, 7.5, dmg, "explosive", float(cfg.get("aoe_radius", 72.0)) * PX_TO_WORLD, col)
+			_spawn_projectile(origin, t_pos, 7.5, dmg, "explosive", float(cfg.get("aoe_radius", 72.0)) * PX_TO_WORLD, col, is_crit)
 		"cryo":
 			sfx_requested.emit("cryo")
 			var rng: float = float(cfg.get("range", 170.0)) * PX_TO_WORLD
@@ -1434,8 +1664,8 @@ func _fire_tower(tid: String, cfg: Dictionary, origin: Vector3, target_idx: int,
 				var ep: Vector3 = e["pos"]
 				if Vector2(ep.x - origin.x, ep.z - origin.z).length() <= rng:
 					e["slow_factor"] = minf(float(e["slow_factor"]), slow_f)
-					e["slow_timer"] = 2.6
-					_damage_enemy_at(i, dmg, "cryo")
+					e["slow_timer"] = 2.6 + float(int(cfg["level"]) - 1) * 0.4
+					_damage_enemy_at(i, dmg, "cryo", false)
 				i -= 1
 		"tesla":
 			sfx_requested.emit("tesla")
@@ -1464,15 +1694,15 @@ func _fire_tower(tid: String, cfg: Dictionary, origin: Vector3, target_idx: int,
 			hit_indices.reverse()
 			for hi in hit_indices:
 				if hi < _enemies.size():
-					_damage_enemy_at(hi, dmg, "electric")
+					_damage_enemy_at(hi, dmg, "electric", false)
 		"laser":
 			sfx_requested.emit("laser")
-			_spawn_beam_vfx(origin, t_pos, 0.07, col, 0.12)
-			_damage_enemy_at(target_idx, dmg, "thermal")
+			_spawn_beam_vfx(origin, t_pos, 0.075, col, 0.12)
+			_damage_enemy_at(target_idx, dmg, "thermal", is_crit)
 		"railgun":
 			sfx_requested.emit("railgun")
 			_spawn_beam_vfx(origin, t_pos, 0.11, col, 0.24)
-			_damage_enemy_at(target_idx, dmg, "pierce")
+			_damage_enemy_at(target_idx, dmg, "pierce", is_crit)
 
 
 func _spawn_muzzle_flash(pos: Vector3, col: Color) -> void:
@@ -1487,7 +1717,7 @@ func _spawn_muzzle_flash(pos: Vector3, col: Color) -> void:
 	_vfx.append({"node": mi, "type": "beam", "ttl": 0.07, "max_ttl": 0.07})
 
 
-func _spawn_projectile(origin: Vector3, dest: Vector3, spd: float, dmg: float, dtype: String, aoe: float, col: Color) -> void:
+func _spawn_projectile(origin: Vector3, dest: Vector3, spd: float, dmg: float, dtype: String, aoe: float, col: Color, is_crit: bool) -> void:
 	var mi := MeshInstance3D.new()
 	var sm := SphereMesh.new()
 	sm.radius = 0.12 if aoe > 0.0 else 0.08
@@ -1498,7 +1728,7 @@ func _spawn_projectile(origin: Vector3, dest: Vector3, spd: float, dmg: float, d
 	_fx_root.add_child(mi)
 	_projectiles.append({
 		"node": mi, "pos": origin, "target_pos": dest, "speed": spd,
-		"damage": dmg, "damage_type": dtype, "aoe": aoe, "color": col
+		"damage": dmg, "damage_type": dtype, "aoe": aoe, "color": col, "crit": is_crit
 	})
 
 
@@ -1523,15 +1753,15 @@ func _spawn_ring_vfx(pos: Vector3, radius: float, col: Color, ttl: float) -> voi
 	_vfx.append({"node": mi, "type": "ring", "target_r": radius, "ttl": ttl, "max_ttl": ttl})
 
 
-func _spawn_damage_label(pos: Vector3, dmg_val: int, col: Color) -> void:
+func _spawn_damage_label(pos: Vector3, dmg_val: int, col: Color, is_crit: bool = false) -> void:
 	if _float_texts.size() > 28:
 		return
 	var lbl := Label3D.new()
-	lbl.text = "-%d" % dmg_val
-	lbl.font_size = 28
+	lbl.text = ("-%d!" % dmg_val) if is_crit else ("-%d" % dmg_val)
+	lbl.font_size = 34 if is_crit else 28
 	lbl.pixel_size = 0.012
 	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	lbl.modulate = col
+	lbl.modulate = Color("#FACC15") if is_crit else col
 	lbl.outline_size = 4
 	lbl.position = pos + Vector3(0.0, 0.95, 0.0)
 	_fx_root.add_child(lbl)
@@ -1549,17 +1779,18 @@ func _process_projectiles(dt: float) -> void:
 		var step: float = float(p["speed"]) * dt
 		if dist <= step + 0.16:
 			var aoe: float = float(p["aoe"])
+			var is_crit: bool = bool(p.get("crit", false))
 			if aoe > 0.0:
 				_spawn_ring_vfx(dest, aoe, p["color"], 0.24)
 				var j: int = _enemies.size() - 1
 				while j >= 0:
 					if (_enemies[j]["pos"] as Vector3).distance_to(dest) <= aoe:
-						_damage_enemy_at(j, float(p["damage"]), str(p["damage_type"]))
+						_damage_enemy_at(j, float(p["damage"]), str(p["damage_type"]), is_crit)
 					j -= 1
 			else:
 				var hit_i: int = _find_closest_enemy(dest, 0.95)
 				if hit_i >= 0:
-					_damage_enemy_at(hit_i, float(p["damage"]), str(p["damage_type"]))
+					_damage_enemy_at(hit_i, float(p["damage"]), str(p["damage_type"]), is_crit)
 			var node: Node3D = p["node"]
 			if is_instance_valid(node):
 				node.queue_free()
@@ -1584,7 +1815,7 @@ func _find_closest_enemy(pos: Vector3, max_dist: float) -> int:
 	return best_i
 
 
-func _damage_enemy_at(idx: int, raw_dmg: float, dmg_type: String) -> void:
+func _damage_enemy_at(idx: int, raw_dmg: float, dmg_type: String, is_crit: bool) -> void:
 	if idx < 0 or idx >= _enemies.size():
 		return
 	var e: Dictionary = _enemies[idx]
@@ -1596,7 +1827,7 @@ func _damage_enemy_at(idx: int, raw_dmg: float, dmg_type: String) -> void:
 		var shield_dmg: float = remaining * shield_mult
 		if float(e["shield"]) >= shield_dmg:
 			e["shield"] = float(e["shield"]) - shield_dmg
-			_spawn_damage_label(e["pos"], int(roundf(shield_dmg)), Color("#38BDF8"))
+			_spawn_damage_label(e["pos"], int(roundf(shield_dmg)), Color("#38BDF8"), is_crit)
 			return
 		else:
 			remaining -= float(e["shield"]) / shield_mult
@@ -1607,7 +1838,7 @@ func _damage_enemy_at(idx: int, raw_dmg: float, dmg_type: String) -> void:
 		armor = 0.0
 	var final_dmg: float = maxf(1.0, remaining - armor * 0.6)
 	e["hp"] = float(e["hp"]) - final_dmg
-	_spawn_damage_label(e["pos"], int(roundf(final_dmg)), Color("#FCA5A5"))
+	_spawn_damage_label(e["pos"], int(roundf(final_dmg)), Color("#FCA5A5"), is_crit)
 
 	var hb: MeshInstance3D = e["hp_bar"]
 	if is_instance_valid(hb):

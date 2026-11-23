@@ -25,6 +25,7 @@ func _ready() -> void:
 	_streams["laser"] = _make_tone(520.0, 500.0, 0.06, 0.18, "sine")
 	_streams["railgun"] = _make_tone(960.0, 110.0, 0.22, 0.42, "saw")
 	_streams["place"] = _make_tone(340.0, 560.0, 0.08, 0.30, "sine")
+	_streams["upgrade"] = _make_tone(420.0, 980.0, 0.16, 0.34, "sine")
 	_streams["sell"] = _make_tone(520.0, 780.0, 0.09, 0.25, "sine")
 	_streams["wave"] = _make_tone(280.0, 560.0, 0.24, 0.32, "saw")
 	_streams["core_hit"] = _make_tone(220.0, 120.0, 0.25, 0.45, "square")
