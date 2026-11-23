@@ -1,0 +1,202 @@
+name: Build & Release Neon Grid Defense
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*.*.*" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+env:
+  GODOT_VERSION: "4.3"
+
+jobs:
+  build-web:
+    name: Build Web (HTML5)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+
+      - name: Export Web build
+        run: |
+          mkdir -p builds/web
+          godot --headless --export-release "Web" builds/web/index.html
+
+      - name: Upload Web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-grid-defense-web
+          path: builds/web
+
+      - name: Setup Pages
+        if: github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: builds/web
+
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    needs: build-web
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  build-windows:
+    name: Build Windows (.exe)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+
+      - name: Export Windows build
+        run: |
+          mkdir -p builds/windows
+          godot --headless --export-release "Windows Desktop" builds/windows/NeonGridDefense.exe
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-grid-defense-windows
+          path: builds/windows
+
+  build-linux:
+    name: Build Linux (x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+
+      - name: Export Linux build
+        run: |
+          mkdir -p builds/linux
+          godot --headless --export-release "Linux" builds/linux/NeonGridDefense.x86_64
+          chmod +x builds/linux/NeonGridDefense.x86_64
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-grid-defense-linux
+          path: builds/linux
+
+  build-macos:
+    name: Build macOS (Universal .zip)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+
+      - name: Export macOS build
+        run: |
+          mkdir -p builds/macos
+          godot --headless --export-release "macOS" builds/macos/NeonGridDefense-macOS.zip
+
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-grid-defense-macos
+          path: builds/macos
+
+  build-android:
+    name: Build Android (APK)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+
+      - name: Create debug keystore
+        run: |
+          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android \
+            -keystore debug.keystore -storepass android \
+            -dname "CN=Android Debug,O=Android,C=US" -validity 9999
+
+      - name: Export Android Debug APK
+        run: |
+          mkdir -p builds/android
+          godot --headless --export-debug "Android" builds/android/NeonGridDefense.apk
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: neon-grid-defense-android
+          path: builds/android
+
+  release:
+    name: Create GitHub Release
+    needs: [build-web, build-windows, build-linux, build-macos, build-android]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Package Web & Linux ZIPs
+        run: |
+          (cd release-artifacts/neon-grid-defense-web && zip -r ../neon-grid-defense-web.zip .)
+          (cd release-artifacts/neon-grid-defense-linux && zip -r ../NeonGridDefense-Linux-x86_64.zip .)
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-artifacts/neon-grid-defense-web.zip
+            release-artifacts/neon-grid-defense-windows/NeonGridDefense.exe
+            release-artifacts/NeonGridDefense-Linux-x86_64.zip
+            release-artifacts/neon-grid-defense-macos/NeonGridDefense-macOS.zip
+            release-artifacts/neon-grid-defense-android/NeonGridDefense.apk
+          generate_release_notes: true

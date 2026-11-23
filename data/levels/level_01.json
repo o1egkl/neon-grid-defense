@@ -1,0 +1,221 @@
+{
+  "id": 1,
+  "name": "01. Open Grid",
+  "theme": "Training Field",
+  "description": "Открытое поле для освоения базового mazing и удлинения маршрута.",
+  "grid_size": [
+    24,
+    14
+  ],
+  "start_gold": 260,
+  "cores_count": 10,
+  "spawns": [
+    [
+      0,
+      6
+    ]
+  ],
+  "core_pos": [
+    23,
+    6
+  ],
+  "walls": [],
+  "no_build_zones": [],
+  "boost_tiles": [
+    [
+      11,
+      6
+    ],
+    [
+      12,
+      6
+    ]
+  ],
+  "waves": [
+    {
+      "wave": 1,
+      "hp_multiplier": 1.0,
+      "bonus_gold": 20,
+      "groups": [
+        {
+          "enemy": "trooper",
+          "count": 6,
+          "interval": 0.9,
+          "delay": 0.0
+        }
+      ]
+    },
+    {
+      "wave": 2,
+      "hp_multiplier": 1.11,
+      "bonus_gold": 23,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 13,
+          "interval": 0.45,
+          "delay": 0.0
+        }
+      ]
+    },
+    {
+      "wave": 3,
+      "hp_multiplier": 1.22,
+      "bonus_gold": 26,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 13,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 7,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 4,
+      "hp_multiplier": 1.33,
+      "bonus_gold": 29,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 14,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 8,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 5,
+      "hp_multiplier": 1.44,
+      "bonus_gold": 32,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 15,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 8,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 6,
+      "hp_multiplier": 1.55,
+      "bonus_gold": 35,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 16,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 9,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 7,
+      "hp_multiplier": 1.66,
+      "bonus_gold": 38,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 17,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 9,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 8,
+      "hp_multiplier": 1.77,
+      "bonus_gold": 41,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 18,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 10,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 9,
+      "hp_multiplier": 1.88,
+      "bonus_gold": 44,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 19,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 10,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 10,
+      "hp_multiplier": 1.99,
+      "bonus_gold": 47,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 20,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 11,
+          "interval": 0.75,
+          "delay": 2.0
+        },
+        {
+          "enemy": "armored",
+          "count": 2,
+          "interval": 1.8,
+          "delay": 2.5,
+          "elite": true
+        }
+      ]
+    }
+  ]
+}

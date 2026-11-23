@@ -1,0 +1,11 @@
+{
+  "enemies": [
+    { "id": "swarm", "name": "Swarm", "hp": 35, "shield": 0, "armor": 0, "speed": 140, "bounty": 4, "is_flying": false },
+    { "id": "trooper", "name": "Trooper", "hp": 90, "shield": 0, "armor": 2, "speed": 95, "bounty": 8, "is_flying": false },
+    { "id": "armored", "name": "Armored Tank", "hp": 260, "shield": 0, "armor": 12, "speed": 65, "bounty": 18, "is_flying": false },
+    { "id": "shielded", "name": "Shielded Unit", "hp": 110, "shield": 120, "armor": 2, "speed": 90, "bounty": 15, "is_flying": false },
+    { "id": "medic", "name": "Medic", "hp": 130, "shield": 0, "armor": 2, "speed": 85, "bounty": 16, "is_flying": false },
+    { "id": "splitter", "name": "Splitter", "hp": 180, "shield": 0, "armor": 4, "speed": 80, "bounty": 14, "is_flying": false },
+    { "id": "drone", "name": "Flyer Drone", "hp": 85, "shield": 20, "armor": 0, "speed": 125, "bounty": 12, "is_flying": true }
+  ]
+}

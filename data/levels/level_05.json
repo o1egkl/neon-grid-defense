@@ -1,0 +1,420 @@
+{
+  "id": 5,
+  "name": "05. Quad Pillars",
+  "theme": "Symmetrical Islands",
+  "description": "Четыре опорных блока и усиленные площадки в центре.",
+  "grid_size": [
+    24,
+    14
+  ],
+  "start_gold": 320,
+  "cores_count": 10,
+  "spawns": [
+    [
+      0,
+      6
+    ]
+  ],
+  "core_pos": [
+    23,
+    6
+  ],
+  "walls": [
+    [
+      5,
+      2
+    ],
+    [
+      5,
+      3
+    ],
+    [
+      5,
+      4
+    ],
+    [
+      5,
+      9
+    ],
+    [
+      5,
+      10
+    ],
+    [
+      5,
+      11
+    ],
+    [
+      6,
+      2
+    ],
+    [
+      6,
+      3
+    ],
+    [
+      6,
+      4
+    ],
+    [
+      6,
+      9
+    ],
+    [
+      6,
+      10
+    ],
+    [
+      6,
+      11
+    ],
+    [
+      7,
+      2
+    ],
+    [
+      7,
+      3
+    ],
+    [
+      7,
+      4
+    ],
+    [
+      7,
+      9
+    ],
+    [
+      7,
+      10
+    ],
+    [
+      7,
+      11
+    ],
+    [
+      16,
+      2
+    ],
+    [
+      16,
+      3
+    ],
+    [
+      16,
+      4
+    ],
+    [
+      16,
+      9
+    ],
+    [
+      16,
+      10
+    ],
+    [
+      16,
+      11
+    ],
+    [
+      17,
+      2
+    ],
+    [
+      17,
+      3
+    ],
+    [
+      17,
+      4
+    ],
+    [
+      17,
+      9
+    ],
+    [
+      17,
+      10
+    ],
+    [
+      17,
+      11
+    ],
+    [
+      18,
+      2
+    ],
+    [
+      18,
+      3
+    ],
+    [
+      18,
+      4
+    ],
+    [
+      18,
+      9
+    ],
+    [
+      18,
+      10
+    ],
+    [
+      18,
+      11
+    ]
+  ],
+  "no_build_zones": [],
+  "boost_tiles": [
+    [
+      11,
+      5
+    ],
+    [
+      11,
+      8
+    ],
+    [
+      12,
+      5
+    ],
+    [
+      12,
+      8
+    ]
+  ],
+  "waves": [
+    {
+      "wave": 1,
+      "hp_multiplier": 1.56,
+      "bonus_gold": 28,
+      "groups": [
+        {
+          "enemy": "trooper",
+          "count": 8,
+          "interval": 0.9,
+          "delay": 0.0
+        }
+      ]
+    },
+    {
+      "wave": 2,
+      "hp_multiplier": 1.67,
+      "bonus_gold": 31,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 17,
+          "interval": 0.45,
+          "delay": 0.0
+        }
+      ]
+    },
+    {
+      "wave": 3,
+      "hp_multiplier": 1.78,
+      "bonus_gold": 34,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 15,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 7,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 4,
+      "hp_multiplier": 1.89,
+      "bonus_gold": 37,
+      "groups": [
+        {
+          "enemy": "armored",
+          "count": 4,
+          "interval": 1.35,
+          "delay": 0.0
+        }
+      ]
+    },
+    {
+      "wave": 5,
+      "hp_multiplier": 2.0,
+      "bonus_gold": 40,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 17,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 8,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 6,
+      "hp_multiplier": 2.11,
+      "bonus_gold": 43,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 18,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 9,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 7,
+      "hp_multiplier": 2.22,
+      "bonus_gold": 46,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 19,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 9,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 8,
+      "hp_multiplier": 2.33,
+      "bonus_gold": 49,
+      "groups": [
+        {
+          "enemy": "armored",
+          "count": 5,
+          "interval": 1.35,
+          "delay": 0.0
+        }
+      ]
+    },
+    {
+      "wave": 9,
+      "hp_multiplier": 2.44,
+      "bonus_gold": 52,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 21,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 10,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 10,
+      "hp_multiplier": 2.55,
+      "bonus_gold": 55,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 22,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 11,
+          "interval": 0.75,
+          "delay": 2.0
+        },
+        {
+          "enemy": "armored",
+          "count": 3,
+          "interval": 1.8,
+          "delay": 2.5,
+          "elite": true
+        }
+      ]
+    },
+    {
+      "wave": 11,
+      "hp_multiplier": 2.66,
+      "bonus_gold": 58,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 23,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 11,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 12,
+      "hp_multiplier": 2.77,
+      "bonus_gold": 61,
+      "groups": [
+        {
+          "enemy": "armored",
+          "count": 7,
+          "interval": 1.35,
+          "delay": 0.0
+        }
+      ]
+    },
+    {
+      "wave": 13,
+      "hp_multiplier": 2.88,
+      "bonus_gold": 64,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 25,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 12,
+          "interval": 0.75,
+          "delay": 2.0
+        },
+        {
+          "enemy": "armored",
+          "count": 3,
+          "interval": 1.8,
+          "delay": 2.5,
+          "elite": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,344 @@
+{
+  "id": 2,
+  "name": "02. Monolith",
+  "theme": "Central Obstacle",
+  "description": "Центральная колонна разделяет поле — удобно заворачивать врагов в S-образный лабиринт.",
+  "grid_size": [
+    24,
+    14
+  ],
+  "start_gold": 280,
+  "cores_count": 10,
+  "spawns": [
+    [
+      0,
+      7
+    ]
+  ],
+  "core_pos": [
+    23,
+    7
+  ],
+  "walls": [
+    [
+      10,
+      4
+    ],
+    [
+      10,
+      5
+    ],
+    [
+      10,
+      6
+    ],
+    [
+      10,
+      7
+    ],
+    [
+      10,
+      8
+    ],
+    [
+      10,
+      9
+    ],
+    [
+      11,
+      4
+    ],
+    [
+      11,
+      5
+    ],
+    [
+      11,
+      6
+    ],
+    [
+      11,
+      7
+    ],
+    [
+      11,
+      8
+    ],
+    [
+      11,
+      9
+    ],
+    [
+      12,
+      4
+    ],
+    [
+      12,
+      5
+    ],
+    [
+      12,
+      6
+    ],
+    [
+      12,
+      7
+    ],
+    [
+      12,
+      8
+    ],
+    [
+      12,
+      9
+    ],
+    [
+      13,
+      4
+    ],
+    [
+      13,
+      5
+    ],
+    [
+      13,
+      6
+    ],
+    [
+      13,
+      7
+    ],
+    [
+      13,
+      8
+    ],
+    [
+      13,
+      9
+    ]
+  ],
+  "no_build_zones": [],
+  "boost_tiles": [
+    [
+      9,
+      3
+    ],
+    [
+      14,
+      10
+    ]
+  ],
+  "waves": [
+    {
+      "wave": 1,
+      "hp_multiplier": 1.14,
+      "bonus_gold": 22,
+      "groups": [
+        {
+          "enemy": "trooper",
+          "count": 7,
+          "interval": 0.9,
+          "delay": 0.0
+        }
+      ]
+    },
+    {
+      "wave": 2,
+      "hp_multiplier": 1.25,
+      "bonus_gold": 25,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 14,
+          "interval": 0.45,
+          "delay": 0.0
+        }
+      ]
+    },
+    {
+      "wave": 3,
+      "hp_multiplier": 1.36,
+      "bonus_gold": 28,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 14,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 7,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 4,
+      "hp_multiplier": 1.47,
+      "bonus_gold": 31,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 15,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 8,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 5,
+      "hp_multiplier": 1.58,
+      "bonus_gold": 34,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 16,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 8,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 6,
+      "hp_multiplier": 1.69,
+      "bonus_gold": 37,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 17,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 9,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 7,
+      "hp_multiplier": 1.8,
+      "bonus_gold": 40,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 18,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 9,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 8,
+      "hp_multiplier": 1.91,
+      "bonus_gold": 43,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 19,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 10,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 9,
+      "hp_multiplier": 2.02,
+      "bonus_gold": 46,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 20,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 10,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 10,
+      "hp_multiplier": 2.13,
+      "bonus_gold": 49,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 21,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 11,
+          "interval": 0.75,
+          "delay": 2.0
+        },
+        {
+          "enemy": "armored",
+          "count": 2,
+          "interval": 1.8,
+          "delay": 2.5,
+          "elite": true
+        }
+      ]
+    },
+    {
+      "wave": 11,
+      "hp_multiplier": 2.24,
+      "bonus_gold": 52,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 22,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 11,
+          "interval": 0.75,
+          "delay": 2.0
+        },
+        {
+          "enemy": "armored",
+          "count": 2,
+          "interval": 1.8,
+          "delay": 2.5,
+          "elite": true
+        }
+      ]
+    }
+  ]
+}

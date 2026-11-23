@@ -1,0 +1,571 @@
+{
+  "id": 19,
+  "name": "19. Citadel Ring",
+  "theme": "360° Defense",
+  "description": "Четыре угла атаки сходятся к центральному ядру. Воздушные дроны и щитовики идут одновременно.",
+  "grid_size": [
+    24,
+    14
+  ],
+  "start_gold": 540,
+  "cores_count": 10,
+  "spawns": [
+    [
+      0,
+      0
+    ],
+    [
+      23,
+      0
+    ],
+    [
+      0,
+      13
+    ],
+    [
+      23,
+      13
+    ]
+  ],
+  "core_pos": [
+    12,
+    7
+  ],
+  "walls": [
+    [
+      8,
+      4
+    ],
+    [
+      8,
+      5
+    ],
+    [
+      8,
+      9
+    ],
+    [
+      8,
+      10
+    ],
+    [
+      9,
+      4
+    ],
+    [
+      9,
+      10
+    ],
+    [
+      15,
+      4
+    ],
+    [
+      15,
+      10
+    ],
+    [
+      16,
+      4
+    ],
+    [
+      16,
+      5
+    ],
+    [
+      16,
+      9
+    ],
+    [
+      16,
+      10
+    ]
+  ],
+  "no_build_zones": [],
+  "boost_tiles": [
+    [
+      10,
+      7
+    ],
+    [
+      12,
+      5
+    ],
+    [
+      12,
+      9
+    ],
+    [
+      14,
+      7
+    ]
+  ],
+  "waves": [
+    {
+      "wave": 1,
+      "hp_multiplier": 3.52,
+      "bonus_gold": 56,
+      "groups": [
+        {
+          "enemy": "trooper",
+          "count": 15,
+          "interval": 0.9,
+          "delay": 0.0
+        }
+      ]
+    },
+    {
+      "wave": 2,
+      "hp_multiplier": 3.63,
+      "bonus_gold": 59,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 31,
+          "interval": 0.45,
+          "delay": 0.0
+        }
+      ]
+    },
+    {
+      "wave": 3,
+      "hp_multiplier": 3.74,
+      "bonus_gold": 62,
+      "groups": [
+        {
+          "enemy": "shielded",
+          "count": 6,
+          "interval": 0.95,
+          "delay": 0.0
+        },
+        {
+          "enemy": "splitter",
+          "count": 3,
+          "interval": 1.2,
+          "delay": 1.5
+        }
+      ]
+    },
+    {
+      "wave": 4,
+      "hp_multiplier": 3.85,
+      "bonus_gold": 65,
+      "groups": [
+        {
+          "enemy": "armored",
+          "count": 4,
+          "interval": 1.35,
+          "delay": 0.0
+        },
+        {
+          "enemy": "medic",
+          "count": 2,
+          "interval": 1.6,
+          "delay": 1.0
+        }
+      ]
+    },
+    {
+      "wave": 5,
+      "hp_multiplier": 3.96,
+      "bonus_gold": 68,
+      "groups": [
+        {
+          "enemy": "drone",
+          "count": 8,
+          "interval": 0.75,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 10,
+          "interval": 0.7,
+          "delay": 1.5
+        }
+      ]
+    },
+    {
+      "wave": 6,
+      "hp_multiplier": 4.07,
+      "bonus_gold": 71,
+      "groups": [
+        {
+          "enemy": "shielded",
+          "count": 8,
+          "interval": 0.95,
+          "delay": 0.0
+        },
+        {
+          "enemy": "splitter",
+          "count": 4,
+          "interval": 1.2,
+          "delay": 1.5
+        }
+      ]
+    },
+    {
+      "wave": 7,
+      "hp_multiplier": 4.18,
+      "bonus_gold": 74,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 26,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 9,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 8,
+      "hp_multiplier": 4.29,
+      "bonus_gold": 77,
+      "groups": [
+        {
+          "enemy": "armored",
+          "count": 5,
+          "interval": 1.35,
+          "delay": 0.0
+        },
+        {
+          "enemy": "medic",
+          "count": 3,
+          "interval": 1.6,
+          "delay": 1.0
+        }
+      ]
+    },
+    {
+      "wave": 9,
+      "hp_multiplier": 4.4,
+      "bonus_gold": 80,
+      "groups": [
+        {
+          "enemy": "shielded",
+          "count": 9,
+          "interval": 0.95,
+          "delay": 0.0
+        },
+        {
+          "enemy": "splitter",
+          "count": 4,
+          "interval": 1.2,
+          "delay": 1.5
+        }
+      ]
+    },
+    {
+      "wave": 10,
+      "hp_multiplier": 4.51,
+      "bonus_gold": 83,
+      "groups": [
+        {
+          "enemy": "drone",
+          "count": 11,
+          "interval": 0.75,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 13,
+          "interval": 0.7,
+          "delay": 1.5
+        },
+        {
+          "enemy": "armored",
+          "count": 5,
+          "interval": 1.8,
+          "delay": 2.5,
+          "elite": true
+        },
+        {
+          "enemy": "shielded",
+          "count": 5,
+          "interval": 1.5,
+          "delay": 3.5,
+          "elite": true
+        },
+        {
+          "enemy": "drone",
+          "count": 8,
+          "interval": 0.8,
+          "delay": 4.0
+        }
+      ]
+    },
+    {
+      "wave": 11,
+      "hp_multiplier": 4.62,
+      "bonus_gold": 86,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 30,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 11,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 12,
+      "hp_multiplier": 4.73,
+      "bonus_gold": 89,
+      "groups": [
+        {
+          "enemy": "armored",
+          "count": 7,
+          "interval": 1.35,
+          "delay": 0.0
+        },
+        {
+          "enemy": "medic",
+          "count": 4,
+          "interval": 1.6,
+          "delay": 1.0
+        }
+      ]
+    },
+    {
+      "wave": 13,
+      "hp_multiplier": 4.84,
+      "bonus_gold": 92,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 32,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 12,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 14,
+      "hp_multiplier": 4.95,
+      "bonus_gold": 95,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 33,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 13,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 15,
+      "hp_multiplier": 5.06,
+      "bonus_gold": 98,
+      "groups": [
+        {
+          "enemy": "drone",
+          "count": 13,
+          "interval": 0.75,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 15,
+          "interval": 0.7,
+          "delay": 1.5
+        }
+      ]
+    },
+    {
+      "wave": 16,
+      "hp_multiplier": 5.17,
+      "bonus_gold": 101,
+      "groups": [
+        {
+          "enemy": "armored",
+          "count": 8,
+          "interval": 1.35,
+          "delay": 0.0
+        },
+        {
+          "enemy": "medic",
+          "count": 4,
+          "interval": 1.6,
+          "delay": 1.0
+        }
+      ]
+    },
+    {
+      "wave": 17,
+      "hp_multiplier": 5.28,
+      "bonus_gold": 104,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 36,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 14,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 18,
+      "hp_multiplier": 5.39,
+      "bonus_gold": 107,
+      "groups": [
+        {
+          "enemy": "shielded",
+          "count": 14,
+          "interval": 0.95,
+          "delay": 0.0
+        },
+        {
+          "enemy": "splitter",
+          "count": 6,
+          "interval": 1.2,
+          "delay": 1.5
+        }
+      ]
+    },
+    {
+      "wave": 19,
+      "hp_multiplier": 5.5,
+      "bonus_gold": 110,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 38,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 15,
+          "interval": 0.75,
+          "delay": 2.0
+        }
+      ]
+    },
+    {
+      "wave": 20,
+      "hp_multiplier": 5.61,
+      "bonus_gold": 113,
+      "groups": [
+        {
+          "enemy": "drone",
+          "count": 16,
+          "interval": 0.75,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 18,
+          "interval": 0.7,
+          "delay": 1.5
+        },
+        {
+          "enemy": "armored",
+          "count": 5,
+          "interval": 1.8,
+          "delay": 2.5,
+          "elite": true
+        },
+        {
+          "enemy": "shielded",
+          "count": 5,
+          "interval": 1.5,
+          "delay": 3.5,
+          "elite": true
+        },
+        {
+          "enemy": "drone",
+          "count": 8,
+          "interval": 0.8,
+          "delay": 4.0
+        }
+      ]
+    },
+    {
+      "wave": 21,
+      "hp_multiplier": 5.72,
+      "bonus_gold": 116,
+      "groups": [
+        {
+          "enemy": "shielded",
+          "count": 15,
+          "interval": 0.95,
+          "delay": 0.0
+        },
+        {
+          "enemy": "splitter",
+          "count": 7,
+          "interval": 1.2,
+          "delay": 1.5
+        }
+      ]
+    },
+    {
+      "wave": 22,
+      "hp_multiplier": 5.83,
+      "bonus_gold": 119,
+      "groups": [
+        {
+          "enemy": "swarm",
+          "count": 41,
+          "interval": 0.4,
+          "delay": 0.0
+        },
+        {
+          "enemy": "trooper",
+          "count": 17,
+          "interval": 0.75,
+          "delay": 2.0
+        },
+        {
+          "enemy": "armored",
+          "count": 5,
+          "interval": 1.8,
+          "delay": 2.5,
+          "elite": true
+        },
+        {
+          "enemy": "shielded",
+          "count": 5,
+          "interval": 1.5,
+          "delay": 3.5,
+          "elite": true
+        },
+        {
+          "enemy": "drone",
+          "count": 8,
+          "interval": 0.8,
+          "delay": 4.0
+        }
+      ]
+    }
+  ]
+}
