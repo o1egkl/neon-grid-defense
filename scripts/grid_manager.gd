@@ -7,7 +7,7 @@ extends Node2D
 signal tower_placed(cell: Vector2i, on_boost: bool)
 signal tower_removed(cell: Vector2i)
 signal paths_updated(paths: Array[PackedVector2Array])
-signal placement_rejected(cell: Vector2i, reason: String)
+signal placement_rejected(cell: Vector2i, reason_key: String)
 signal level_loaded(level_data: Dictionary)
 
 enum CellType { EMPTY, WALL, NO_BUILD, BOOST, SPAWN, CORE, TOWER }
@@ -32,20 +32,29 @@ enum CellType { EMPTY, WALL, NO_BUILD, BOOST, SPAWN, CORE, TOWER }
 
 var pathfinding := PathfindingService.new()
 var current_level_data: Dictionary = {}
-var _cells: Dictionary = {} # Vector2i -> CellType
-var _boost_set: Dictionary = {} # Vector2i -> bool
+var input_enabled := false
+
+var _cells: Dictionary = {}
+var _boost_set: Dictionary = {}
 var _hover_cell := Vector2i(-1, -1)
 var _can_place_hover := false
-var _build_mode := true
 var _path_lines: Array[Line2D] = []
 
 
 func _ready() -> void:
+	SettingsManager.settings_changed.connect(_on_settings_changed)
 	if FileAccess.file_exists("res://data/levels/level_01.json"):
 		load_level_from_file("res://data/levels/level_01.json")
 	else:
 		_init_grid()
 		_refresh_main_paths()
+
+
+func _on_settings_changed() -> void:
+	for line in _path_lines:
+		if is_instance_valid(line):
+			line.visible = SettingsManager.show_path_preview
+	queue_redraw()
 
 
 func load_level_from_file(path: String) -> bool:
@@ -114,7 +123,7 @@ func _init_grid() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not _build_mode:
+	if not input_enabled:
 		return
 
 	if event is InputEventMouseMotion:
@@ -142,14 +151,14 @@ func try_place_tower(cell: Vector2i, active_enemy_cells: Array[Vector2i] = []) -
 	if not _cells.has(cell):
 		return false
 	if _cells[cell] == CellType.NO_BUILD:
-		placement_rejected.emit(cell, "Зона запрета строительства!")
+		placement_rejected.emit(cell, "msg_no_build")
 		return false
 	if not _is_buildable_cell(cell):
-		placement_rejected.emit(cell, "Клетка занята")
+		placement_rejected.emit(cell, "msg_occupied")
 		return false
 
 	if not pathfinding.can_place_tower(cell, spawns, core_cell, active_enemy_cells):
-		placement_rejected.emit(cell, "Нельзя полностью заблокировать путь!")
+		placement_rejected.emit(cell, "msg_blocked")
 		return false
 
 	_cells[cell] = CellType.TOWER
@@ -230,6 +239,7 @@ func _rebuild_path_lines() -> void:
 		line.joint_mode = Line2D.LINE_JOINT_ROUND
 		line.begin_cap_mode = Line2D.LINE_CAP_ROUND
 		line.end_cap_mode = Line2D.LINE_CAP_ROUND
+		line.visible = SettingsManager.show_path_preview
 		add_child(line)
 		_path_lines.append(line)
 
@@ -256,14 +266,15 @@ func _draw() -> void:
 				var tower_col := Color("#10B981") if _boost_set.has(cell) else Color("#3B82F6")
 				draw_rect(rect, tower_col)
 
-	for x in grid_size.x + 1:
-		var px := x * cell_size.x
-		draw_line(Vector2(px, 0.0), Vector2(px, total_size.y), grid_line_color, 1.0)
-	for y in grid_size.y + 1:
-		var py := y * cell_size.y
-		draw_line(Vector2(0.0, py), Vector2(total_size.x, py), grid_line_color, 1.0)
+	if SettingsManager.show_grid_lines:
+		for x in grid_size.x + 1:
+			var px := x * cell_size.x
+			draw_line(Vector2(px, 0.0), Vector2(px, total_size.y), grid_line_color, 1.0)
+		for y in grid_size.y + 1:
+			var py := y * cell_size.y
+			draw_line(Vector2(0.0, py), Vector2(total_size.x, py), grid_line_color, 1.0)
 
-	if _cells.has(_hover_cell):
+	if input_enabled and _cells.has(_hover_cell):
 		var hover_rect := Rect2(Vector2(_hover_cell) * cell_size, cell_size).grow(-2.0)
 		var color := valid_hover_color if _can_place_hover else invalid_hover_color
 		draw_rect(hover_rect, color)
