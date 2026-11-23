@@ -1,9 +1,9 @@
 extends Node3D
 
 ## 3D Изометрический движок Neon Grid Defense (Godot 4.3 GL Compatibility):
-## - Ортографическая изометрическая камера 45°, WorldEnvironment с Glow/Bloom, свет
-## - Объёмные металлические плитки, неоновая 3D-трасса, светящееся Energy Core с кольцами
-## - 6 процедурных 3D-башен с наведением стволов, 7 типов 3D-врагов, 3D-лучи/молнии/кольца и Label3D урона
+## - Загружает реальные 3D-модели (.glb) башен из res://assets/models/towers/ и врагов из res://assets/models/enemies/
+## - Сплошная неоновая 3D-трасса с закруглёнными поворотами (look_at_from_position, 0 ошибок в консоли)
+## - Оранжевые 3D-порталы спавна, светящееся Energy Core с вращающимися кольцами и Glow/Bloom
 
 signal tower_place_requested(cell: Vector2i, on_boost: bool)
 signal tower_remove_requested(cell: Vector2i, tower_id: String)
@@ -36,8 +36,10 @@ var game_speed: float = 1.0
 var cores_remaining: int = 10
 
 var _enemy_catalog: Dictionary = {}
+var _tower_scenes: Dictionary = {} # id -> PackedScene
+var _enemy_scenes: Dictionary = {} # id -> PackedScene
 var _cells: Dictionary = {}
-var _placed_towers: Dictionary = {} # Vector2i -> Dictionary (runtime + 3D node refs)
+var _placed_towers: Dictionary = {}
 var _boost_set: Dictionary = {}
 var _hover_cell := Vector2i(-1, -1)
 var _can_place_hover: bool = false
@@ -77,6 +79,7 @@ var _anim_time: float = 0.0
 
 func _ready() -> void:
 	_load_enemy_catalog()
+	_preload_glb_models()
 	_setup_environment_and_camera()
 	_setup_containers()
 	SettingsManager.settings_changed.connect(_on_settings_changed)
@@ -94,16 +97,28 @@ func _load_enemy_catalog() -> void:
 			_enemy_catalog[str(e.get("id", ""))] = e
 
 
+func _preload_glb_models() -> void:
+	for tid in ["pulse", "cannon", "cryo", "tesla", "laser", "railgun"]:
+		var p: String = "res://assets/models/towers/%s.glb" % tid
+		if ResourceLoader.exists(p):
+			_tower_scenes[tid] = load(p)
+	for eid in ["swarm", "trooper", "armored", "shielded", "medic", "splitter", "drone"]:
+		var p: String = "res://assets/models/enemies/%s.glb" % eid
+		if ResourceLoader.exists(p):
+			_enemy_scenes[eid] = load(p)
+
+
 func _setup_environment_and_camera() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("#060A12")
+	env.background_color = Color("#050810")
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("#3B5578")
-	env.ambient_light_energy = 0.85
+	env.ambient_light_color = Color("#1E3350")
+	env.ambient_light_energy = 0.55
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.glow_enabled = true
-	env.glow_intensity = 0.85
-	env.glow_bloom = 0.28
+	env.glow_intensity = 0.90
+	env.glow_bloom = 0.30
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
 
 	var we := WorldEnvironment.new()
@@ -111,15 +126,15 @@ func _setup_environment_and_camera() -> void:
 	add_child(we)
 
 	var sun := DirectionalLight3D.new()
-	sun.light_color = Color("#DCEBFF")
-	sun.light_energy = 1.15
-	sun.rotation_degrees = Vector3(-52.0, 35.0, 0.0)
+	sun.light_color = Color("#E0F0FF")
+	sun.light_energy = 1.25
+	sun.rotation_degrees = Vector3(-50.0, 38.0, 0.0)
 	add_child(sun)
 
 	var rim := DirectionalLight3D.new()
 	rim.light_color = Color("#00A8CC")
 	rim.light_energy = 0.45
-	rim.rotation_degrees = Vector3(-25.0, -145.0, 0.0)
+	rim.rotation_degrees = Vector3(-28.0, -140.0, 0.0)
 	add_child(rim)
 
 	_camera = Camera3D.new()
@@ -142,25 +157,23 @@ func _setup_containers() -> void:
 	_fx_root = Node3D.new()
 	add_child(_fx_root)
 
-	# Hover tile highlight
 	_hover_box = MeshInstance3D.new()
 	var hmesh := BoxMesh.new()
-	hmesh.size = Vector3(0.94, 0.10, 0.94)
+	hmesh.size = Vector3(0.94, 0.08, 0.94)
 	_hover_box.mesh = hmesh
 	_hover_mat = _make_mat(Color("#00E5FF"), 1.6, 0.35)
 	_hover_box.material_override = _hover_mat
 	_hover_box.visible = false
 	add_child(_hover_box)
 
-	# Attack range preview ring
 	_range_ring = MeshInstance3D.new()
 	var rmesh := TorusMesh.new()
-	rmesh.inner_radius = 0.94
+	rmesh.inner_radius = 0.95
 	rmesh.outer_radius = 1.0
 	rmesh.rings = 48
 	rmesh.ring_segments = 8
 	_range_ring.mesh = rmesh
-	_range_mat = _make_mat(Color("#00E5FF"), 2.0, 0.70)
+	_range_mat = _make_mat(Color("#00E5FF"), 2.0, 0.72)
 	_range_ring.material_override = _range_mat
 	_range_ring.visible = false
 	add_child(_range_ring)
@@ -170,16 +183,15 @@ func _update_camera_fit() -> void:
 	if not _camera:
 		return
 	var center := Vector3(float(grid_size.x) * 0.5, 0.0, float(grid_size.y) * 0.5)
-	# Изометрический угол 45° (как на дизайн-концепте)
-	var offset := Vector3(0.0, 22.0, 17.5).rotated(Vector3.UP, deg_to_rad(32.0))
-	_camera.position = center + offset
-	_camera.look_at(center + Vector3(0.0, -0.4, 0.5), Vector3.UP)
+	var offset := Vector3(0.0, 26.0, 21.0).rotated(Vector3.UP, deg_to_rad(30.0))
+	_camera.look_at_from_position(center + offset, center + Vector3(0.0, -0.3, 0.6), Vector3.UP)
 
 	var vp: Vector2 = get_viewport().get_visible_rect().size
 	var aspect: float = maxf(vp.x / maxf(vp.y, 1.0), 0.5)
-	var base_size: float = 17.8
-	if aspect < 1.55:
-		base_size = 17.8 * (1.55 / aspect)
+	# Размер подобран так, чтобы ВСЕ 4 угла сетки 24x14 целиком помещались между верхним HUD и нижним магазином
+	var base_size: float = 22.8
+	if aspect < 1.65:
+		base_size = 22.8 * (1.65 / aspect)
 	_camera.size = base_size
 
 
@@ -197,7 +209,7 @@ func is_wave_active() -> bool:
 	return _wave_active
 
 
-func _make_mat(col: Color, emission_strength: float = 0.0, alpha: float = 1.0, metallic: float = 0.35, roughness: float = 0.45) -> StandardMaterial3D:
+func _make_mat(col: Color, emission_strength: float = 0.0, alpha: float = 1.0, metallic: float = 0.45, roughness: float = 0.40) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = Color(col.r, col.g, col.b, alpha)
 	m.metallic = metallic
@@ -310,32 +322,33 @@ func _build_3d_board() -> void:
 	_core_ring_b = null
 	_core_light = null
 
-	# Подложка поля (тёмная плита)
+	# Тёмная подложка плиты поля
 	var base_plate := MeshInstance3D.new()
 	var plate_mesh := BoxMesh.new()
-	plate_mesh.size = Vector3(float(grid_size.x) + 0.8, 0.35, float(grid_size.y) + 0.8)
+	plate_mesh.size = Vector3(float(grid_size.x) + 0.6, 0.36, float(grid_size.y) + 0.6)
 	base_plate.mesh = plate_mesh
-	base_plate.position = Vector3(float(grid_size.x) * 0.5, -0.35, float(grid_size.y) * 0.5)
-	base_plate.material_override = _make_mat(Color("#080D16"), 0.0, 1.0, 0.6, 0.5)
+	base_plate.position = Vector3(float(grid_size.x) * 0.5, -0.34, float(grid_size.y) * 0.5)
+	base_plate.material_override = _make_mat(Color("#070C15"), 0.0, 1.0, 0.65, 0.45)
 	_board_root.add_child(base_plate)
 
 	var tile_mesh := BoxMesh.new()
-	tile_mesh.size = Vector3(0.92, 0.18, 0.92)
+	tile_mesh.size = Vector3(0.90, 0.16, 0.90)
 	var road_mesh := BoxMesh.new()
-	road_mesh.size = Vector3(0.96, 0.10, 0.96)
+	road_mesh.size = Vector3(0.96, 0.09, 0.96)
 	var wall_mesh := BoxMesh.new()
-	wall_mesh.size = Vector3(0.90, 0.65, 0.90)
+	wall_mesh.size = Vector3(0.88, 0.62, 0.88)
 
-	var mat_empty := _make_mat(Color("#131E30"), 0.0, 1.0, 0.5, 0.42)
-	var mat_road := _make_mat(Color("#0C1C2E"), 0.15, 1.0, 0.4, 0.5)
-	var mat_wall := _make_mat(Color("#25344A"), 0.05, 1.0, 0.6, 0.35)
-	var mat_boost := _make_mat(Color("#0F3D34"), 0.45, 1.0, 0.4, 0.35)
-	var mat_boost_ring := _make_mat(Color("#10B981"), 2.2, 1.0, 0.2, 0.2)
-	var mat_spawn := _make_mat(Color("#F97316"), 2.0, 1.0, 0.2, 0.2)
+	var mat_empty := _make_mat(Color("#1A263A"), 0.0, 1.0, 0.62, 0.36)
+	var mat_road := _make_mat(Color("#0D1C2E"), 0.10, 1.0, 0.45, 0.45)
+	var mat_wall := _make_mat(Color("#2B3D56"), 0.05, 1.0, 0.70, 0.32)
+	var mat_boost := _make_mat(Color("#103B34"), 0.45, 1.0, 0.50, 0.32)
+	var mat_boost_ring := _make_mat(Color("#10B981"), 2.4, 1.0, 0.2, 0.2)
+	var mat_portal_ring := _make_mat(Color("#F97316"), 3.0, 1.0, 0.1, 0.15)
+	var mat_portal_core := _make_mat(Color("#FB923C"), 2.2, 0.55, 0.0, 0.1)
 
 	var boost_ring_mesh := TorusMesh.new()
 	boost_ring_mesh.inner_radius = 0.28
-	boost_ring_mesh.outer_radius = 0.36
+	boost_ring_mesh.outer_radius = 0.35
 	boost_ring_mesh.rings = 20
 	boost_ring_mesh.ring_segments = 8
 
@@ -346,22 +359,22 @@ func _build_3d_board() -> void:
 		match ct:
 			CellType.EMPTY:
 				tile.mesh = tile_mesh
-				tile.position = Vector3(pos.x, -0.09, pos.z)
+				tile.position = Vector3(pos.x, -0.08, pos.z)
 				tile.material_override = mat_empty
 				_board_root.add_child(tile)
 			CellType.PATH:
 				tile.mesh = road_mesh
-				tile.position = Vector3(pos.x, -0.13, pos.z)
+				tile.position = Vector3(pos.x, -0.12, pos.z)
 				tile.material_override = mat_road
 				_board_root.add_child(tile)
 			CellType.WALL:
 				tile.mesh = wall_mesh
-				tile.position = Vector3(pos.x, 0.14, pos.z)
+				tile.position = Vector3(pos.x, 0.15, pos.z)
 				tile.material_override = mat_wall
 				_board_root.add_child(tile)
 			CellType.BOOST:
 				tile.mesh = tile_mesh
-				tile.position = Vector3(pos.x, -0.09, pos.z)
+				tile.position = Vector3(pos.x, -0.08, pos.z)
 				tile.material_override = mat_boost
 				_board_root.add_child(tile)
 				var ring := MeshInstance3D.new()
@@ -371,52 +384,75 @@ func _build_3d_board() -> void:
 				_board_root.add_child(ring)
 			CellType.SPAWN:
 				tile.mesh = road_mesh
-				tile.position = Vector3(pos.x, -0.13, pos.z)
+				tile.position = Vector3(pos.x, -0.12, pos.z)
 				tile.material_override = mat_road
 				_board_root.add_child(tile)
-				var gate := MeshInstance3D.new()
-				var gmesh := TorusMesh.new()
-				gmesh.inner_radius = 0.30
-				gmesh.outer_radius = 0.42
-				gate.mesh = gmesh
-				gate.position = Vector3(pos.x, 0.25, pos.z)
-				gate.rotation_degrees = Vector3(90.0, 0.0, 0.0)
-				gate.material_override = mat_spawn
-				_board_root.add_child(gate)
+				_build_spawn_portal(pos, mat_portal_ring, mat_portal_core)
 			CellType.CORE:
 				tile.mesh = road_mesh
-				tile.position = Vector3(pos.x, -0.13, pos.z)
+				tile.position = Vector3(pos.x, -0.12, pos.z)
 				tile.material_override = mat_road
 				_board_root.add_child(tile)
 				_build_energy_core(pos)
 
 
+func _build_spawn_portal(pos: Vector3, ring_mat: Material, core_mat: Material) -> void:
+	var gate := MeshInstance3D.new()
+	var gmesh := TorusMesh.new()
+	gmesh.inner_radius = 0.40
+	gmesh.outer_radius = 0.52
+	gmesh.rings = 24
+	gate.mesh = gmesh
+	gate.position = Vector3(pos.x, 0.56, pos.z)
+	gate.rotation_degrees = Vector3(90.0, 90.0, 0.0)
+	gate.material_override = ring_mat
+	_board_root.add_child(gate)
+
+	var disc := MeshInstance3D.new()
+	var dmesh := CylinderMesh.new()
+	dmesh.top_radius = 0.40
+	dmesh.bottom_radius = 0.40
+	dmesh.height = 0.04
+	disc.mesh = dmesh
+	disc.position = Vector3(pos.x, 0.56, pos.z)
+	disc.rotation_degrees = Vector3(0.0, 0.0, 90.0)
+	disc.material_override = core_mat
+	_board_root.add_child(disc)
+
+	var light := OmniLight3D.new()
+	light.light_color = Color("#F97316")
+	light.light_energy = 2.0
+	light.omni_range = 4.5
+	light.position = Vector3(pos.x, 0.9, pos.z)
+	_board_root.add_child(light)
+
+
 func _build_energy_core(pos: Vector3) -> void:
-	_core_mat = _make_mat(Color("#00E5FF"), 3.2, 1.0, 0.1, 0.15)
+	_core_mat = _make_mat(Color("#00E5FF"), 3.4, 1.0, 0.1, 0.12)
 	_core_sphere = MeshInstance3D.new()
 	var smesh := SphereMesh.new()
-	smesh.radius = 0.44
-	smesh.height = 0.88
+	smesh.radius = 0.46
+	smesh.height = 0.92
 	_core_sphere.mesh = smesh
-	_core_sphere.position = Vector3(pos.x, 0.58, pos.z)
+	_core_sphere.position = Vector3(pos.x, 0.60, pos.z)
 	_core_sphere.material_override = _core_mat
 	_board_root.add_child(_core_sphere)
 
-	var ring_mat := _make_mat(Color("#00E5FF"), 2.4, 0.85, 0.1, 0.2)
+	var ring_mat := _make_mat(Color("#00E5FF"), 2.6, 0.88, 0.1, 0.2)
 	_core_ring_a = MeshInstance3D.new()
 	var r1 := TorusMesh.new()
-	r1.inner_radius = 0.68
-	r1.outer_radius = 0.74
+	r1.inner_radius = 0.70
+	r1.outer_radius = 0.76
 	r1.rings = 32
 	_core_ring_a.mesh = r1
-	_core_ring_a.position = Vector3(pos.x, 0.12, pos.z)
+	_core_ring_a.position = Vector3(pos.x, 0.14, pos.z)
 	_core_ring_a.material_override = ring_mat
 	_board_root.add_child(_core_ring_a)
 
 	_core_ring_b = MeshInstance3D.new()
 	var r2 := TorusMesh.new()
-	r2.inner_radius = 1.02
-	r2.outer_radius = 1.07
+	r2.inner_radius = 1.06
+	r2.outer_radius = 1.12
 	r2.rings = 36
 	_core_ring_b.mesh = r2
 	_core_ring_b.position = Vector3(pos.x, 0.08, pos.z)
@@ -425,21 +461,30 @@ func _build_energy_core(pos: Vector3) -> void:
 
 	_core_light = OmniLight3D.new()
 	_core_light.light_color = Color("#00E5FF")
-	_core_light.light_energy = 2.6
-	_core_light.omni_range = 6.5
-	_core_light.position = Vector3(pos.x, 1.3, pos.z)
+	_core_light.light_energy = 3.0
+	_core_light.omni_range = 7.0
+	_core_light.position = Vector3(pos.x, 1.35, pos.z)
 	_board_root.add_child(_core_light)
 
 
 func _build_3d_routes() -> void:
 	_clear_node_children(_route_root)
-	var line_mat := _make_mat(Color("#00E5FF"), 2.8, 0.92, 0.1, 0.2)
+	var line_mat := _make_mat(Color("#00E5FF"), 3.0, 0.95, 0.1, 0.15)
+	var joint_mesh := SphereMesh.new()
+	joint_mesh.radius = 0.06
+	joint_mesh.height = 0.12
+
 	for path in fixed_paths:
 		for i in range(path.size() - 1):
-			var a: Vector3 = cell_to_world_3d(path[i]) + Vector3(0.0, -0.04, 0.0)
-			var b: Vector3 = cell_to_world_3d(path[i + 1]) + Vector3(0.0, -0.04, 0.0)
-			var seg := _create_beam_mesh(a, b, 0.09, line_mat)
+			var a: Vector3 = cell_to_world_3d(path[i]) + Vector3(0.0, -0.02, 0.0)
+			var b: Vector3 = cell_to_world_3d(path[i + 1]) + Vector3(0.0, -0.02, 0.0)
+			var seg := _create_beam_mesh(a, b, 0.10, line_mat)
 			_route_root.add_child(seg)
+			var cap := MeshInstance3D.new()
+			cap.mesh = joint_mesh
+			cap.position = b
+			cap.material_override = line_mat
+			_route_root.add_child(cap)
 	_route_root.visible = SettingsManager.show_path_preview
 
 
@@ -450,11 +495,8 @@ func _create_beam_mesh(a: Vector3, b: Vector3, thickness: float, mat: Material) 
 	bm.size = Vector3(thickness, thickness, dist)
 	mi.mesh = bm
 	mi.material_override = mat
-	mi.position = (a + b) * 0.5
-	if absf((b - a).normalized().y) < 0.99:
-		mi.look_at(b, Vector3.UP)
-	else:
-		mi.look_at(b, Vector3.RIGHT)
+	var up_vec: Vector3 = Vector3.UP if absf((b - a).normalized().y) < 0.99 else Vector3.RIGHT
+	mi.look_at_from_position((a + b) * 0.5, b, up_vec)
 	return mi
 
 
@@ -552,16 +594,28 @@ func _handle_right_click(cell: Vector2i) -> void:
 func commit_place_tower(cell: Vector2i, tower_cfg: Dictionary) -> void:
 	_cells[cell] = CellType.TOWER
 	var tid: String = str(tower_cfg.get("id", "pulse"))
-	var col := Color(str(tower_cfg.get("color", "#3B82F6")))
-	var built: Dictionary = _build_tower_3d_model(tid, col, _boost_set.has(cell))
-	var root_node: Node3D = built["root"]
+	var root_node := Node3D.new()
 	root_node.position = cell_to_world_3d(cell)
+
+	var model_holder := Node3D.new()
+	root_node.add_child(model_holder)
+	if _tower_scenes.has(tid):
+		var inst: Node = (_tower_scenes[tid] as PackedScene).instantiate()
+		model_holder.add_child(inst)
+	else:
+		var fb := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.6, 0.6, 0.6)
+		fb.mesh = bm
+		fb.position.y = 0.3
+		model_holder.add_child(fb)
+
 	_towers_root.add_child(root_node)
 
 	var runtime_cfg: Dictionary = tower_cfg.duplicate()
 	runtime_cfg["cooldown"] = 0.0
 	runtime_cfg["node"] = root_node
-	runtime_cfg["head"] = built["head"]
+	runtime_cfg["head"] = model_holder
 	_placed_towers[cell] = runtime_cfg
 	_can_place_hover = false
 	_update_hover_visuals()
@@ -578,135 +632,6 @@ func commit_remove_tower(cell: Vector2i) -> void:
 	_can_place_hover = _is_buildable_cell(_hover_cell)
 	_update_hover_visuals()
 	sfx_requested.emit("sell")
-
-
-func _build_tower_3d_model(tid: String, col: Color, on_boost: bool) -> Dictionary:
-	var root := Node3D.new()
-	var base := MeshInstance3D.new()
-	var bmesh := CylinderMesh.new()
-	bmesh.top_radius = 0.34
-	bmesh.bottom_radius = 0.42
-	bmesh.height = 0.26
-	bmesh.radial_segments = 8
-	base.mesh = bmesh
-	base.position = Vector3(0.0, 0.13, 0.0)
-	base.material_override = _make_mat(Color("#1A2639"), 0.15 if on_boost else 0.0, 1.0, 0.7, 0.35)
-	root.add_child(base)
-
-	var head := Node3D.new()
-	head.position = Vector3(0.0, 0.38, 0.0)
-	root.add_child(head)
-
-	var accent_mat := _make_mat(col, 1.8, 1.0, 0.4, 0.25)
-	var steel_mat := _make_mat(Color("#334155"), 0.0, 1.0, 0.75, 0.3)
-
-	match tid:
-		"pulse":
-			var body := MeshInstance3D.new()
-			var bm := BoxMesh.new()
-			bm.size = Vector3(0.36, 0.26, 0.42)
-			body.mesh = bm
-			body.material_override = accent_mat
-			head.add_child(body)
-			for side in [-0.10, 0.10]:
-				var barrel := MeshInstance3D.new()
-				var cm := CylinderMesh.new()
-				cm.top_radius = 0.045
-				cm.bottom_radius = 0.055
-				cm.height = 0.48
-				barrel.mesh = cm
-				barrel.rotation_degrees = Vector3(90.0, 0.0, 0.0)
-				barrel.position = Vector3(side, 0.04, 0.32)
-				barrel.material_override = steel_mat
-				head.add_child(barrel)
-		"cannon":
-			var body := MeshInstance3D.new()
-			var bm := BoxMesh.new()
-			bm.size = Vector3(0.46, 0.30, 0.46)
-			body.mesh = bm
-			body.material_override = steel_mat
-			head.add_child(body)
-			var tube := MeshInstance3D.new()
-			var cm := CylinderMesh.new()
-			cm.top_radius = 0.12
-			cm.bottom_radius = 0.16
-			cm.height = 0.62
-			tube.mesh = cm
-			tube.rotation_degrees = Vector3(62.0, 0.0, 0.0)
-			tube.position = Vector3(0.0, 0.18, 0.22)
-			tube.material_override = accent_mat
-			head.add_child(tube)
-		"cryo":
-			var crystal := MeshInstance3D.new()
-			var cm := CylinderMesh.new()
-			cm.top_radius = 0.02
-			cm.bottom_radius = 0.24
-			cm.height = 0.68
-			cm.radial_segments = 6
-			crystal.mesh = cm
-			crystal.position = Vector3(0.0, 0.24, 0.0)
-			crystal.material_override = _make_mat(col, 2.5, 0.92, 0.1, 0.1)
-			head.add_child(crystal)
-		"tesla":
-			var spire := MeshInstance3D.new()
-			var sm := CylinderMesh.new()
-			sm.top_radius = 0.07
-			sm.bottom_radius = 0.14
-			sm.height = 0.72
-			spire.mesh = sm
-			spire.position = Vector3(0.0, 0.26, 0.0)
-			spire.material_override = steel_mat
-			head.add_child(spire)
-			for ry in [0.16, 0.34, 0.50]:
-				var ring := MeshInstance3D.new()
-				var tm := TorusMesh.new()
-				tm.inner_radius = 0.16
-				tm.outer_radius = 0.22
-				ring.mesh = tm
-				ring.position = Vector3(0.0, ry, 0.0)
-				ring.material_override = accent_mat
-				head.add_child(ring)
-			var orb := MeshInstance3D.new()
-			var om := SphereMesh.new()
-			om.radius = 0.14
-			om.height = 0.28
-			orb.mesh = om
-			orb.position = Vector3(0.0, 0.68, 0.0)
-			orb.material_override = _make_mat(col, 3.0, 1.0, 0.1, 0.1)
-			head.add_child(orb)
-		"laser":
-			var emitter := MeshInstance3D.new()
-			var em := BoxMesh.new()
-			em.size = Vector3(0.32, 0.32, 0.52)
-			emitter.mesh = em
-			emitter.material_override = steel_mat
-			head.add_child(emitter)
-			var lens := MeshInstance3D.new()
-			var lm := SphereMesh.new()
-			lm.radius = 0.14
-			lm.height = 0.28
-			lens.mesh = lm
-			lens.position = Vector3(0.0, 0.04, 0.28)
-			lens.material_override = _make_mat(col, 2.8, 1.0, 0.1, 0.1)
-			head.add_child(lens)
-		"railgun":
-			for side in [-0.11, 0.11]:
-				var rail := MeshInstance3D.new()
-				var rm := BoxMesh.new()
-				rm.size = Vector3(0.08, 0.14, 0.88)
-				rail.mesh = rm
-				rail.position = Vector3(side, 0.06, 0.22)
-				rail.material_override = accent_mat
-				head.add_child(rail)
-			var core := MeshInstance3D.new()
-			var cm := BoxMesh.new()
-			cm.size = Vector3(0.08, 0.08, 0.72)
-			core.mesh = cm
-			core.position = Vector3(0.0, 0.06, 0.20)
-			core.material_override = _make_mat(Color("#FEF08A"), 2.8, 1.0, 0.1, 0.1)
-			head.add_child(core)
-
-	return {"root": root, "head": head}
 
 
 func start_next_wave() -> bool:
@@ -750,7 +675,7 @@ func start_next_wave() -> bool:
 func _process(delta: float) -> void:
 	_anim_time += delta
 	if is_instance_valid(_core_sphere):
-		_core_sphere.position.y = 0.58 + sin(_anim_time * 2.6) * 0.08
+		_core_sphere.position.y = 0.60 + sin(_anim_time * 2.6) * 0.08
 	if is_instance_valid(_core_ring_a):
 		_core_ring_a.rotation.y = _anim_time * 1.1
 	if is_instance_valid(_core_ring_b):
@@ -791,105 +716,58 @@ func _spawn_enemy(item: Dictionary) -> void:
 	var pidx: int = int(item["path_idx"])
 	var path_cells: Array = fixed_paths[pidx] if pidx < fixed_paths.size() else [core_cell]
 	var is_flying: bool = bool(base.get("is_flying", false))
-	var start_pos: Vector3 = cell_to_world_3d(path_cells[0]) + Vector3(0.0, 1.15 if is_flying else 0.25, 0.0)
+	var start_pos: Vector3 = cell_to_world_3d(path_cells[0]) + Vector3(0.0, 1.15 if is_flying else 0.02, 0.0)
 	var max_hp: float = float(base.get("hp", 80)) * hp_mult
 	var max_shield: float = float(base.get("shield", 0)) * hp_mult
 	var elite: bool = bool(item.get("elite", false))
 
-	var visual: Dictionary = _build_enemy_3d_model(eid, elite, max_shield > 0.0)
+	var visual: Dictionary = _build_enemy_3d_node(eid, elite, max_shield > 0.0)
 	var node: Node3D = visual["root"]
 	node.position = start_pos
 	_enemies_root.add_child(node)
 
 	_enemies.append({
-		"id": eid,
-		"pos": start_pos,
-		"path_idx": pidx,
-		"wp_idx": 1,
-		"progress": 0.0,
-		"hp": max_hp,
-		"max_hp": max_hp,
-		"shield": max_shield,
-		"max_shield": max_shield,
-		"armor": float(base.get("armor", 0)),
-		"speed": float(base.get("speed", 90)) * PX_TO_WORLD,
-		"bounty": int(base.get("bounty", 8)),
-		"is_flying": is_flying,
-		"elite": elite,
-		"slow_timer": 0.0,
-		"slow_factor": 1.0,
-		"medic_cd": 2.0,
-		"shield_regen_cd": 0.0,
-		"node": node,
-		"shield_mesh": visual["shield"],
-		"hp_bar": visual["hp_bar"]
+		"id": eid, "pos": start_pos, "path_idx": pidx, "wp_idx": 1, "progress": 0.0,
+		"hp": max_hp, "max_hp": max_hp, "shield": max_shield, "max_shield": max_shield,
+		"armor": float(base.get("armor", 0)), "speed": float(base.get("speed", 90)) * PX_TO_WORLD,
+		"bounty": int(base.get("bounty", 8)), "is_flying": is_flying, "elite": elite,
+		"slow_timer": 0.0, "slow_factor": 1.0, "medic_cd": 2.0, "shield_regen_cd": 0.0,
+		"node": node, "shield_mesh": visual["shield"], "hp_bar": visual["hp_bar"]
 	})
 
 
-func _build_enemy_3d_model(eid: String, elite: bool, has_shield: bool) -> Dictionary:
+func _build_enemy_3d_node(eid: String, elite: bool, has_shield: bool) -> Dictionary:
 	var root := Node3D.new()
-	var sc: float = 1.25 if elite else 1.0
-	var col := Color("#EF4444")
-	var body := MeshInstance3D.new()
+	var sc: float = 1.28 if elite else 1.0
 
-	match eid:
-		"swarm":
-			col = Color("#FB7185")
-			var sm := SphereMesh.new()
-			sm.radius = 0.18 * sc
-			sm.height = 0.36 * sc
-			body.mesh = sm
-		"armored":
-			col = Color("#94A3B8")
-			var bm := BoxMesh.new()
-			bm.size = Vector3(0.54 * sc, 0.32 * sc, 0.64 * sc)
-			body.mesh = bm
-		"shielded":
-			col = Color("#A855F7")
-			var bm := BoxMesh.new()
-			bm.size = Vector3(0.42 * sc, 0.42 * sc, 0.42 * sc)
-			body.mesh = bm
-		"medic":
-			col = Color("#22C55E")
-			var cm := CylinderMesh.new()
-			cm.top_radius = 0.24 * sc
-			cm.bottom_radius = 0.28 * sc
-			cm.height = 0.32 * sc
-			body.mesh = cm
-		"splitter":
-			col = Color("#F59E0B")
-			var bm := BoxMesh.new()
-			bm.size = Vector3(0.44 * sc, 0.44 * sc, 0.44 * sc)
-			body.mesh = bm
-			body.rotation_degrees = Vector3(0.0, 45.0, 0.0)
-		"drone":
-			col = Color("#38BDF8")
-			var bm := BoxMesh.new()
-			bm.size = Vector3(0.52 * sc, 0.14 * sc, 0.36 * sc)
-			body.mesh = bm
-		_:
-			var bm := BoxMesh.new()
-			bm.size = Vector3(0.38 * sc, 0.34 * sc, 0.46 * sc)
-			body.mesh = bm
-
-	body.material_override = _make_mat(col, 0.9, 1.0, 0.5, 0.35)
-	root.add_child(body)
+	if _enemy_scenes.has(eid):
+		var inst: Node3D = (_enemy_scenes[eid] as PackedScene).instantiate()
+		inst.scale = Vector3(sc, sc, sc)
+		root.add_child(inst)
+	else:
+		var fb := MeshInstance3D.new()
+		var bm := BoxMesh.new()
+		bm.size = Vector3(0.4 * sc, 0.4 * sc, 0.4 * sc)
+		fb.mesh = bm
+		fb.position.y = 0.2 * sc
+		root.add_child(fb)
 
 	var shield_mesh: MeshInstance3D = null
 	if has_shield:
 		shield_mesh = MeshInstance3D.new()
 		var shm := SphereMesh.new()
-		shm.radius = 0.44 * sc
-		shm.height = 0.88 * sc
+		shm.radius = 0.48 * sc
+		shm.height = 0.96 * sc
 		shield_mesh.mesh = shm
-		shield_mesh.material_override = _make_mat(Color("#38BDF8"), 1.6, 0.32, 0.1, 0.1)
+		shield_mesh.position.y = 0.34 * sc
+		shield_mesh.material_override = _make_mat(Color("#38BDF8"), 1.6, 0.30, 0.1, 0.1)
 		root.add_child(shield_mesh)
 
 	var hp_bar := MeshInstance3D.new()
 	var hbm := BoxMesh.new()
-	hbm.size = Vector3(0.60, 0.07, 0.07)
+	hbm.size = Vector3(0.62, 0.07, 0.07)
 	hp_bar.mesh = hbm
-	hp_bar.position = Vector3(0.0, 0.52 * sc, 0.0)
+	hp_bar.position = Vector3(0.0, 0.78 * sc, 0.0)
 	hp_bar.material_override = _make_mat(Color("#22C55E"), 1.8, 1.0, 0.0, 0.5)
 	hp_bar.visible = false
 	root.add_child(hp_bar)
@@ -943,7 +821,7 @@ func _process_enemies(dt: float) -> void:
 			if wp_idx >= path_cells.size():
 				reached_core = true
 			else:
-				target_pos = cell_to_world_3d(path_cells[wp_idx]) + Vector3(0.0, 0.25, 0.0)
+				target_pos = cell_to_world_3d(path_cells[wp_idx]) + Vector3(0.0, 0.02, 0.0)
 				var dir: Vector3 = target_pos - cur_pos
 				var dist: float = dir.length()
 				if dist <= spd * dt:
@@ -959,10 +837,12 @@ func _process_enemies(dt: float) -> void:
 		e["pos"] = cur_pos
 		var node: Node3D = e["node"]
 		if is_instance_valid(node):
-			node.position = cur_pos
 			var flat_t := Vector3(target_pos.x, cur_pos.y, target_pos.z)
 			if cur_pos.distance_to(flat_t) > 0.05:
-				node.look_at(flat_t, Vector3.UP)
+				node.look_at_from_position(cur_pos, flat_t, Vector3.UP)
+				node.rotate_y(PI)
+			else:
+				node.position = cur_pos
 
 		if reached_core:
 			if is_instance_valid(node):
@@ -986,13 +866,13 @@ func _process_towers(dt: float) -> void:
 		var tid: String = str(t.get("id", "pulse"))
 		var head: Node3D = t.get("head", null)
 		if tid == "cryo" and is_instance_valid(head):
-			head.rotation.y += dt * 1.6
+			head.rotation.y += dt * 1.4
 
 		t["cooldown"] = maxf(0.0, float(t["cooldown"]) - dt)
 		if float(t["cooldown"]) > 0.0:
 			continue
 
-		var t_pos: Vector3 = cell_to_world_3d(cell) + Vector3(0.0, 0.45, 0.0)
+		var t_pos: Vector3 = cell_to_world_3d(cell) + Vector3(0.0, 0.48, 0.0)
 		var rng: float = float(t.get("range", 180.0)) * PX_TO_WORLD
 		var target_idx: int = _find_target_index(t_pos, rng)
 		if target_idx < 0:
@@ -1029,7 +909,7 @@ func _find_target_index(origin: Vector3, rng: float) -> int:
 
 func _fire_tower(tid: String, cfg: Dictionary, origin: Vector3, target_idx: int, dmg: float) -> void:
 	var target: Dictionary = _enemies[target_idx]
-	var t_pos: Vector3 = target["pos"]
+	var t_pos: Vector3 = (target["pos"] as Vector3) + Vector3(0.0, 0.30, 0.0)
 	var col := Color(str(cfg.get("color", "#00E5FF")))
 
 	match tid:
@@ -1058,7 +938,7 @@ func _fire_tower(tid: String, cfg: Dictionary, origin: Vector3, target_idx: int,
 			var max_chains: int = int(cfg.get("chain_count", 3))
 			var hit_indices: Array[int] = [target_idx]
 			var last_pos: Vector3 = t_pos
-			_spawn_beam_vfx(origin + Vector3(0.0, 0.45, 0.0), t_pos, 0.08, col, 0.16)
+			_spawn_beam_vfx(origin + Vector3(0.0, 0.52, 0.0), t_pos, 0.08, col, 0.16)
 			for _c in range(max_chains - 1):
 				var next_i: int = -1
 				var best_d: float = 3.2
@@ -1071,7 +951,7 @@ func _fire_tower(tid: String, cfg: Dictionary, origin: Vector3, target_idx: int,
 						next_i = j
 				if next_i >= 0:
 					hit_indices.append(next_i)
-					var next_pos: Vector3 = _enemies[next_i]["pos"]
+					var next_pos: Vector3 = (_enemies[next_i]["pos"] as Vector3) + Vector3(0.0, 0.30, 0.0)
 					_spawn_beam_vfx(last_pos, next_pos, 0.07, col, 0.16)
 					last_pos = next_pos
 				else:
@@ -1098,7 +978,7 @@ func _spawn_projectile(origin: Vector3, dest: Vector3, spd: float, dmg: float, d
 	sm.height = sm.radius * 2.0
 	mi.mesh = sm
 	mi.position = origin
-	mi.material_override = _make_mat(col, 2.6, 1.0, 0.1, 0.1)
+	mi.material_override = _make_mat(col, 2.8, 1.0, 0.1, 0.1)
 	_fx_root.add_child(mi)
 	_projectiles.append({
 		"node": mi, "pos": origin, "target_pos": dest, "speed": spd,
@@ -1107,7 +987,7 @@ func _spawn_projectile(origin: Vector3, dest: Vector3, spd: float, dmg: float, d
 
 
 func _spawn_beam_vfx(a: Vector3, b: Vector3, thickness: float, col: Color, ttl: float) -> void:
-	var mat := _make_mat(col, 3.0, 0.95, 0.0, 0.1)
+	var mat := _make_mat(col, 3.2, 0.95, 0.0, 0.1)
 	var mi := _create_beam_mesh(a, b, thickness, mat)
 	_fx_root.add_child(mi)
 	_vfx.append({"node": mi, "type": "beam", "ttl": ttl, "max_ttl": ttl})
@@ -1122,7 +1002,7 @@ func _spawn_ring_vfx(pos: Vector3, radius: float, col: Color, ttl: float) -> voi
 	mi.mesh = tm
 	mi.position = Vector3(pos.x, 0.18, pos.z)
 	mi.scale = Vector3(0.2, 1.0, 0.2)
-	mi.material_override = _make_mat(col, 2.5, 0.8, 0.0, 0.1)
+	mi.material_override = _make_mat(col, 2.6, 0.82, 0.0, 0.1)
 	_fx_root.add_child(mi)
 	_vfx.append({"node": mi, "type": "ring", "target_r": radius, "ttl": ttl, "max_ttl": ttl})
 
@@ -1137,7 +1017,7 @@ func _spawn_damage_label(pos: Vector3, dmg_val: int, col: Color) -> void:
 	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	lbl.modulate = col
 	lbl.outline_size = 4
-	lbl.position = pos + Vector3(0.0, 0.72, 0.0)
+	lbl.position = pos + Vector3(0.0, 0.85, 0.0)
 	_fx_root.add_child(lbl)
 	_float_texts.append({"node": lbl, "ttl": 0.55})
 
@@ -1236,7 +1116,7 @@ func _damage_enemy_at(idx: int, raw_dmg: float, dmg_type: String) -> void:
 		if eid == "splitter":
 			for off_x in [-0.25, 0.25]:
 				var sw: Dictionary = _enemy_catalog.get("swarm", {"hp": 35, "speed": 140, "bounty": 4})
-				var vis: Dictionary = _build_enemy_3d_model("swarm", false, false)
+				var vis: Dictionary = _build_enemy_3d_node("swarm", false, false)
 				var snode: Node3D = vis["root"]
 				var spos: Vector3 = death_pos + Vector3(off_x, 0.0, 0.0)
 				snode.position = spos
