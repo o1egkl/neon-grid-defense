@@ -392,7 +392,12 @@ func _rebuild_tower_shop_cards() -> void:
 		var is_sel: bool = (tid == _selected_tower_id)
 
 		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(215, 84)
+		btn.custom_minimum_size = Vector2(242, 88)
+		btn.expand_icon = true
+		var icon_path: String = "res://assets/sprites/towers/%s.png" % tid
+		if ResourceLoader.exists(icon_path):
+			btn.icon = load(icon_path)
+			btn.add_theme_constant_override("icon_max_width", 56)
 		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		btn.add_theme_font_size_override("font_size", 12)
 		btn.text = "[%d] %s  —  %d %s\n%s: %d | %s: %d | %s: %.1f/s\n%s" % [

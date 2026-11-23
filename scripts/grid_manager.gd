@@ -1,9 +1,9 @@
 extends Node3D
 
-## 3D Изометрический движок Neon Grid Defense (Godot 4.3 GL Compatibility):
-## - Загружает реальные 3D-модели (.glb) башен из res://assets/models/towers/ и врагов из res://assets/models/enemies/
-## - Сплошная неоновая 3D-трасса с закруглёнными поворотами (look_at_from_position, 0 ошибок в консоли)
-## - Оранжевые 3D-порталы спавна, светящееся Energy Core с вращающимися кольцами и Glow/Bloom
+## 2.5D/3D Изометрический движок Neon Grid Defense (Godot 4.3 GL Compatibility):
+## - Объёмная тёмно-металлическая 3D-доска с Glow/Bloom, оранжевыми 3D-порталами и неоновой трассой
+## - Детализированные 2.5D изометрические спрайты (Sprite3D) для всех 6 башен, 7 врагов и Energy Core
+## - Анимация отдачи башен при выстреле, зеркалирование по направлению цели/движения, 3D-лучи, молнии и урон
 
 signal tower_place_requested(cell: Vector2i, on_boost: bool)
 signal tower_remove_requested(cell: Vector2i, tower_id: String)
@@ -36,8 +36,10 @@ var game_speed: float = 1.0
 var cores_remaining: int = 10
 
 var _enemy_catalog: Dictionary = {}
-var _tower_scenes: Dictionary = {} # id -> PackedScene
-var _enemy_scenes: Dictionary = {} # id -> PackedScene
+var _tower_textures: Dictionary = {} # id -> Texture2D
+var _enemy_textures: Dictionary = {} # id -> Texture2D
+var _core_texture: Texture2D = null
+
 var _cells: Dictionary = {}
 var _placed_towers: Dictionary = {}
 var _boost_set: Dictionary = {}
@@ -55,11 +57,10 @@ var _hover_box: MeshInstance3D
 var _hover_mat: StandardMaterial3D
 var _range_ring: MeshInstance3D
 var _range_mat: StandardMaterial3D
-var _core_sphere: MeshInstance3D
+var _core_sprite: Sprite3D
 var _core_ring_a: MeshInstance3D
 var _core_ring_b: MeshInstance3D
 var _core_light: OmniLight3D
-var _core_mat: StandardMaterial3D
 
 # Combat runtime
 var _waves_data: Array = []
@@ -79,7 +80,7 @@ var _anim_time: float = 0.0
 
 func _ready() -> void:
 	_load_enemy_catalog()
-	_preload_glb_models()
+	_preload_sprites()
 	_setup_environment_and_camera()
 	_setup_containers()
 	SettingsManager.settings_changed.connect(_on_settings_changed)
@@ -97,15 +98,17 @@ func _load_enemy_catalog() -> void:
 			_enemy_catalog[str(e.get("id", ""))] = e
 
 
-func _preload_glb_models() -> void:
+func _preload_sprites() -> void:
 	for tid in ["pulse", "cannon", "cryo", "tesla", "laser", "railgun"]:
-		var p: String = "res://assets/models/towers/%s.glb" % tid
+		var p: String = "res://assets/sprites/towers/%s.png" % tid
 		if ResourceLoader.exists(p):
-			_tower_scenes[tid] = load(p)
+			_tower_textures[tid] = load(p)
 	for eid in ["swarm", "trooper", "armored", "shielded", "medic", "splitter", "drone"]:
-		var p: String = "res://assets/models/enemies/%s.glb" % eid
+		var p: String = "res://assets/sprites/enemies/%s.png" % eid
 		if ResourceLoader.exists(p):
-			_enemy_scenes[eid] = load(p)
+			_enemy_textures[eid] = load(p)
+	if ResourceLoader.exists("res://assets/sprites/core.png"):
+		_core_texture = load("res://assets/sprites/core.png")
 
 
 func _setup_environment_and_camera() -> void:
@@ -117,8 +120,8 @@ func _setup_environment_and_camera() -> void:
 	env.ambient_light_energy = 0.55
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.glow_enabled = true
-	env.glow_intensity = 0.90
-	env.glow_bloom = 0.30
+	env.glow_intensity = 0.85
+	env.glow_bloom = 0.25
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
 
 	var we := WorldEnvironment.new()
@@ -188,7 +191,6 @@ func _update_camera_fit() -> void:
 
 	var vp: Vector2 = get_viewport().get_visible_rect().size
 	var aspect: float = maxf(vp.x / maxf(vp.y, 1.0), 0.5)
-	# Размер подобран так, чтобы ВСЕ 4 угла сетки 24x14 целиком помещались между верхним HUD и нижним магазином
 	var base_size: float = 22.8
 	if aspect < 1.65:
 		base_size = 22.8 * (1.65 / aspect)
@@ -317,12 +319,11 @@ func _build_3d_board() -> void:
 	_clear_node_children(_towers_root)
 	_clear_node_children(_enemies_root)
 	_clear_node_children(_fx_root)
-	_core_sphere = null
+	_core_sprite = null
 	_core_ring_a = null
 	_core_ring_b = null
 	_core_light = null
 
-	# Тёмная подложка плиты поля
 	var base_plate := MeshInstance3D.new()
 	var plate_mesh := BoxMesh.new()
 	plate_mesh.size = Vector3(float(grid_size.x) + 0.6, 0.36, float(grid_size.y) + 0.6)
@@ -336,7 +337,7 @@ func _build_3d_board() -> void:
 	var road_mesh := BoxMesh.new()
 	road_mesh.size = Vector3(0.96, 0.09, 0.96)
 	var wall_mesh := BoxMesh.new()
-	wall_mesh.size = Vector3(0.88, 0.62, 0.88)
+	wall_mesh.size = Vector3(0.88, 0.58, 0.88)
 
 	var mat_empty := _make_mat(Color("#1A263A"), 0.0, 1.0, 0.62, 0.36)
 	var mat_road := _make_mat(Color("#0D1C2E"), 0.10, 1.0, 0.45, 0.45)
@@ -369,7 +370,7 @@ func _build_3d_board() -> void:
 				_board_root.add_child(tile)
 			CellType.WALL:
 				tile.mesh = wall_mesh
-				tile.position = Vector3(pos.x, 0.15, pos.z)
+				tile.position = Vector3(pos.x, 0.14, pos.z)
 				tile.material_override = mat_wall
 				_board_root.add_child(tile)
 			CellType.BOOST:
@@ -399,8 +400,8 @@ func _build_3d_board() -> void:
 func _build_spawn_portal(pos: Vector3, ring_mat: Material, core_mat: Material) -> void:
 	var gate := MeshInstance3D.new()
 	var gmesh := TorusMesh.new()
-	gmesh.inner_radius = 0.40
-	gmesh.outer_radius = 0.52
+	gmesh.inner_radius = 0.42
+	gmesh.outer_radius = 0.54
 	gmesh.rings = 24
 	gate.mesh = gmesh
 	gate.position = Vector3(pos.x, 0.56, pos.z)
@@ -410,8 +411,8 @@ func _build_spawn_portal(pos: Vector3, ring_mat: Material, core_mat: Material) -
 
 	var disc := MeshInstance3D.new()
 	var dmesh := CylinderMesh.new()
-	dmesh.top_radius = 0.40
-	dmesh.bottom_radius = 0.40
+	dmesh.top_radius = 0.42
+	dmesh.bottom_radius = 0.42
 	dmesh.height = 0.04
 	disc.mesh = dmesh
 	disc.position = Vector3(pos.x, 0.56, pos.z)
@@ -428,36 +429,31 @@ func _build_spawn_portal(pos: Vector3, ring_mat: Material, core_mat: Material) -
 
 
 func _build_energy_core(pos: Vector3) -> void:
-	_core_mat = _make_mat(Color("#00E5FF"), 3.4, 1.0, 0.1, 0.12)
-	_core_sphere = MeshInstance3D.new()
-	var smesh := SphereMesh.new()
-	smesh.radius = 0.46
-	smesh.height = 0.92
-	_core_sphere.mesh = smesh
-	_core_sphere.position = Vector3(pos.x, 0.60, pos.z)
-	_core_sphere.material_override = _core_mat
-	_board_root.add_child(_core_sphere)
-
 	var ring_mat := _make_mat(Color("#00E5FF"), 2.6, 0.88, 0.1, 0.2)
 	_core_ring_a = MeshInstance3D.new()
 	var r1 := TorusMesh.new()
-	r1.inner_radius = 0.70
-	r1.outer_radius = 0.76
+	r1.inner_radius = 0.80
+	r1.outer_radius = 0.86
 	r1.rings = 32
 	_core_ring_a.mesh = r1
-	_core_ring_a.position = Vector3(pos.x, 0.14, pos.z)
+	_core_ring_a.position = Vector3(pos.x, 0.08, pos.z)
 	_core_ring_a.material_override = ring_mat
 	_board_root.add_child(_core_ring_a)
 
 	_core_ring_b = MeshInstance3D.new()
 	var r2 := TorusMesh.new()
-	r2.inner_radius = 1.06
-	r2.outer_radius = 1.12
+	r2.inner_radius = 1.18
+	r2.outer_radius = 1.24
 	r2.rings = 36
 	_core_ring_b.mesh = r2
-	_core_ring_b.position = Vector3(pos.x, 0.08, pos.z)
+	_core_ring_b.position = Vector3(pos.x, 0.04, pos.z)
 	_core_ring_b.material_override = ring_mat
 	_board_root.add_child(_core_ring_b)
+
+	if _core_texture:
+		_core_sprite = _make_billboard_sprite(_core_texture, 0.0085)
+		_core_sprite.position = Vector3(pos.x, 0.95, pos.z)
+		_board_root.add_child(_core_sprite)
 
 	_core_light = OmniLight3D.new()
 	_core_light.light_color = Color("#00E5FF")
@@ -465,6 +461,18 @@ func _build_energy_core(pos: Vector3) -> void:
 	_core_light.omni_range = 7.0
 	_core_light.position = Vector3(pos.x, 1.35, pos.z)
 	_board_root.add_child(_core_light)
+
+
+func _make_billboard_sprite(tex: Texture2D, px_size: float = 0.0062) -> Sprite3D:
+	var sp := Sprite3D.new()
+	sp.texture = tex
+	sp.pixel_size = px_size
+	sp.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	sp.transparent = true
+	sp.shaded = false
+	sp.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
+	sp.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	return sp
 
 
 func _build_3d_routes() -> void:
@@ -513,9 +521,7 @@ func _raycast_mouse_to_cell(screen_pos: Vector2) -> Vector2i:
 	if hit == null:
 		return Vector2i(-1, -1)
 	var p: Vector3 = hit
-	var cx: int = floori(p.x / TILE_SIZE)
-	var cy: int = floori(p.z / TILE_SIZE)
-	return Vector2i(cx, cy)
+	return Vector2i(floori(p.x / TILE_SIZE), floori(p.z / TILE_SIZE))
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -597,25 +603,19 @@ func commit_place_tower(cell: Vector2i, tower_cfg: Dictionary) -> void:
 	var root_node := Node3D.new()
 	root_node.position = cell_to_world_3d(cell)
 
-	var model_holder := Node3D.new()
-	root_node.add_child(model_holder)
-	if _tower_scenes.has(tid):
-		var inst: Node = (_tower_scenes[tid] as PackedScene).instantiate()
-		model_holder.add_child(inst)
-	else:
-		var fb := MeshInstance3D.new()
-		var bm := BoxMesh.new()
-		bm.size = Vector3(0.6, 0.6, 0.6)
-		fb.mesh = bm
-		fb.position.y = 0.3
-		model_holder.add_child(fb)
+	var sp: Sprite3D = null
+	if _tower_textures.has(tid):
+		sp = _make_billboard_sprite(_tower_textures[tid], 0.0064)
+		sp.position = Vector3(0.0, 0.72, 0.0)
+		root_node.add_child(sp)
 
 	_towers_root.add_child(root_node)
 
 	var runtime_cfg: Dictionary = tower_cfg.duplicate()
 	runtime_cfg["cooldown"] = 0.0
+	runtime_cfg["recoil"] = 0.0
 	runtime_cfg["node"] = root_node
-	runtime_cfg["head"] = model_holder
+	runtime_cfg["sprite"] = sp
 	_placed_towers[cell] = runtime_cfg
 	_can_place_hover = false
 	_update_hover_visuals()
@@ -674,8 +674,8 @@ func start_next_wave() -> bool:
 
 func _process(delta: float) -> void:
 	_anim_time += delta
-	if is_instance_valid(_core_sphere):
-		_core_sphere.position.y = 0.60 + sin(_anim_time * 2.6) * 0.08
+	if is_instance_valid(_core_sprite):
+		_core_sprite.position.y = 0.95 + sin(_anim_time * 2.5) * 0.07
 	if is_instance_valid(_core_ring_a):
 		_core_ring_a.rotation.y = _anim_time * 1.1
 	if is_instance_valid(_core_ring_b):
@@ -683,12 +683,11 @@ func _process(delta: float) -> void:
 
 	if _core_flash > 0.0:
 		_core_flash = maxf(0.0, _core_flash - delta * 2.5)
-		if _core_mat:
-			var c := Color("#FF3B5C") if _core_flash > 0.2 else Color("#00E5FF")
-			_core_mat.albedo_color = c
-			_core_mat.emission = c
-			if is_instance_valid(_core_light):
-				_core_light.light_color = c
+		var c := Color("#FF3B5C") if _core_flash > 0.2 else Color.WHITE
+		if is_instance_valid(_core_sprite):
+			_core_sprite.modulate = c
+		if is_instance_valid(_core_light):
+			_core_light.light_color = Color("#FF3B5C") if _core_flash > 0.2 else Color("#00E5FF")
 
 	var dt: float = delta * game_speed
 	if _wave_active and not _ended:
@@ -721,7 +720,7 @@ func _spawn_enemy(item: Dictionary) -> void:
 	var max_shield: float = float(base.get("shield", 0)) * hp_mult
 	var elite: bool = bool(item.get("elite", false))
 
-	var visual: Dictionary = _build_enemy_3d_node(eid, elite, max_shield > 0.0)
+	var visual: Dictionary = _build_enemy_sprite_node(eid, elite)
 	var node: Node3D = visual["root"]
 	node.position = start_pos
 	_enemies_root.add_child(node)
@@ -732,47 +731,35 @@ func _spawn_enemy(item: Dictionary) -> void:
 		"armor": float(base.get("armor", 0)), "speed": float(base.get("speed", 90)) * PX_TO_WORLD,
 		"bounty": int(base.get("bounty", 8)), "is_flying": is_flying, "elite": elite,
 		"slow_timer": 0.0, "slow_factor": 1.0, "medic_cd": 2.0, "shield_regen_cd": 0.0,
-		"node": node, "shield_mesh": visual["shield"], "hp_bar": visual["hp_bar"]
+		"node": node, "sprite": visual["sprite"], "hp_bar": visual["hp_bar"]
 	})
 
 
-func _build_enemy_3d_node(eid: String, elite: bool, has_shield: bool) -> Dictionary:
+func _build_enemy_sprite_node(eid: String, elite: bool) -> Dictionary:
 	var root := Node3D.new()
-	var sc: float = 1.28 if elite else 1.0
+	var sc: float = 1.25 if elite else 1.0
+	var px: float = 0.0056 * sc
+	if eid == "swarm":
+		px = 0.0042 * sc
+	elif eid == "armored" or eid == "shielded":
+		px = 0.0066 * sc
 
-	if _enemy_scenes.has(eid):
-		var inst: Node3D = (_enemy_scenes[eid] as PackedScene).instantiate()
-		inst.scale = Vector3(sc, sc, sc)
-		root.add_child(inst)
-	else:
-		var fb := MeshInstance3D.new()
-		var bm := BoxMesh.new()
-		bm.size = Vector3(0.4 * sc, 0.4 * sc, 0.4 * sc)
-		fb.mesh = bm
-		fb.position.y = 0.2 * sc
-		root.add_child(fb)
-
-	var shield_mesh: MeshInstance3D = null
-	if has_shield:
-		shield_mesh = MeshInstance3D.new()
-		var shm := SphereMesh.new()
-		shm.radius = 0.48 * sc
-		shm.height = 0.96 * sc
-		shield_mesh.mesh = shm
-		shield_mesh.position.y = 0.34 * sc
-		shield_mesh.material_override = _make_mat(Color("#38BDF8"), 1.6, 0.30, 0.1, 0.1)
-		root.add_child(shield_mesh)
+	var sp: Sprite3D = null
+	if _enemy_textures.has(eid):
+		sp = _make_billboard_sprite(_enemy_textures[eid], px)
+		sp.position = Vector3(0.0, 0.62 * sc, 0.0)
+		root.add_child(sp)
 
 	var hp_bar := MeshInstance3D.new()
 	var hbm := BoxMesh.new()
-	hbm.size = Vector3(0.62, 0.07, 0.07)
+	hbm.size = Vector3(0.68, 0.07, 0.07)
 	hp_bar.mesh = hbm
-	hp_bar.position = Vector3(0.0, 0.78 * sc, 0.0)
+	hp_bar.position = Vector3(0.0, 1.25 * sc, 0.0)
 	hp_bar.material_override = _make_mat(Color("#22C55E"), 1.8, 1.0, 0.0, 0.5)
 	hp_bar.visible = false
 	root.add_child(hp_bar)
 
-	return {"root": root, "shield": shield_mesh, "hp_bar": hp_bar}
+	return {"root": root, "sprite": sp, "hp_bar": hp_bar}
 
 
 func _process_enemies(dt: float) -> void:
@@ -780,18 +767,20 @@ func _process_enemies(dt: float) -> void:
 	var i: int = _enemies.size() - 1
 	while i >= 0:
 		var e: Dictionary = _enemies[i]
+		var sp: Sprite3D = e["sprite"]
 		if float(e["slow_timer"]) > 0.0:
 			e["slow_timer"] = float(e["slow_timer"]) - dt
 			if float(e["slow_timer"]) <= 0.0:
 				e["slow_factor"] = 1.0
+			if is_instance_valid(sp):
+				sp.modulate = Color("#7DD3FC")
+		elif is_instance_valid(sp):
+			sp.modulate = Color.WHITE
 
 		if float(e["max_shield"]) > 0.0:
 			e["shield_regen_cd"] = maxf(0.0, float(e["shield_regen_cd"]) - dt)
 			if float(e["shield_regen_cd"]) <= 0.0 and float(e["shield"]) < float(e["max_shield"]):
 				e["shield"] = minf(float(e["max_shield"]), float(e["shield"]) + float(e["max_shield"]) * 0.12 * dt)
-			var sm: MeshInstance3D = e["shield_mesh"]
-			if is_instance_valid(sm):
-				sm.visible = float(e["shield"]) > 0.5
 
 		if str(e["id"]) == "medic":
 			e["medic_cd"] = float(e["medic_cd"]) - dt
@@ -837,12 +826,13 @@ func _process_enemies(dt: float) -> void:
 		e["pos"] = cur_pos
 		var node: Node3D = e["node"]
 		if is_instance_valid(node):
-			var flat_t := Vector3(target_pos.x, cur_pos.y, target_pos.z)
-			if cur_pos.distance_to(flat_t) > 0.05:
-				node.look_at_from_position(cur_pos, flat_t, Vector3.UP)
-				node.rotate_y(PI)
-			else:
-				node.position = cur_pos
+			node.position = cur_pos
+			if bool(e["is_flying"]):
+				node.position.y = 1.15 + sin(_anim_time * 4.0 + float(i)) * 0.10
+		if is_instance_valid(sp):
+			var move_dx: float = target_pos.x - cur_pos.x
+			if absf(move_dx) > 0.05:
+				sp.flip_h = move_dx < 0.0
 
 		if reached_core:
 			if is_instance_valid(node):
@@ -863,16 +853,18 @@ func _process_enemies(dt: float) -> void:
 func _process_towers(dt: float) -> void:
 	for cell: Vector2i in _placed_towers:
 		var t: Dictionary = _placed_towers[cell]
-		var tid: String = str(t.get("id", "pulse"))
-		var head: Node3D = t.get("head", null)
-		if tid == "cryo" and is_instance_valid(head):
-			head.rotation.y += dt * 1.4
+		var sp: Sprite3D = t.get("sprite", null)
+		if float(t["recoil"]) > 0.0:
+			t["recoil"] = maxf(0.0, float(t["recoil"]) - dt * 5.0)
+			if is_instance_valid(sp):
+				var s: float = 1.0 + float(t["recoil"]) * 0.14
+				sp.scale = Vector3(s, s, s)
 
 		t["cooldown"] = maxf(0.0, float(t["cooldown"]) - dt)
 		if float(t["cooldown"]) > 0.0:
 			continue
 
-		var t_pos: Vector3 = cell_to_world_3d(cell) + Vector3(0.0, 0.48, 0.0)
+		var t_pos: Vector3 = cell_to_world_3d(cell) + Vector3(0.0, 0.55, 0.0)
 		var rng: float = float(t.get("range", 180.0)) * PX_TO_WORLD
 		var target_idx: int = _find_target_index(t_pos, rng)
 		if target_idx < 0:
@@ -880,15 +872,14 @@ func _process_towers(dt: float) -> void:
 
 		var fire_rate: float = maxf(0.1, float(t.get("fire_rate", 1.0)))
 		t["cooldown"] = 1.0 / fire_rate
+		t["recoil"] = 1.0
 		var dmg: float = float(t.get("damage", 12.0)) * (1.2 if _boost_set.has(cell) else 1.0)
+		var tid: String = str(t.get("id", "pulse"))
 		var target: Dictionary = _enemies[target_idx]
 		var e_pos: Vector3 = target["pos"]
 
-		if is_instance_valid(head) and tid != "cryo" and tid != "tesla":
-			var look_p := Vector3(e_pos.x, head.global_position.y, e_pos.z)
-			if head.global_position.distance_to(look_p) > 0.05:
-				head.look_at(look_p, Vector3.UP)
-				head.rotate_y(PI)
+		if is_instance_valid(sp) and tid != "cryo" and tid != "tesla":
+			sp.flip_h = (e_pos.x < t_pos.x)
 
 		_fire_tower(tid, t, t_pos, target_idx, dmg)
 
@@ -909,7 +900,7 @@ func _find_target_index(origin: Vector3, rng: float) -> int:
 
 func _fire_tower(tid: String, cfg: Dictionary, origin: Vector3, target_idx: int, dmg: float) -> void:
 	var target: Dictionary = _enemies[target_idx]
-	var t_pos: Vector3 = (target["pos"] as Vector3) + Vector3(0.0, 0.30, 0.0)
+	var t_pos: Vector3 = (target["pos"] as Vector3) + Vector3(0.0, 0.35, 0.0)
 	var col := Color(str(cfg.get("color", "#00E5FF")))
 
 	match tid:
@@ -938,7 +929,7 @@ func _fire_tower(tid: String, cfg: Dictionary, origin: Vector3, target_idx: int,
 			var max_chains: int = int(cfg.get("chain_count", 3))
 			var hit_indices: Array[int] = [target_idx]
 			var last_pos: Vector3 = t_pos
-			_spawn_beam_vfx(origin + Vector3(0.0, 0.52, 0.0), t_pos, 0.08, col, 0.16)
+			_spawn_beam_vfx(origin + Vector3(0.0, 0.55, 0.0), t_pos, 0.08, col, 0.16)
 			for _c in range(max_chains - 1):
 				var next_i: int = -1
 				var best_d: float = 3.2
@@ -951,7 +942,7 @@ func _fire_tower(tid: String, cfg: Dictionary, origin: Vector3, target_idx: int,
 						next_i = j
 				if next_i >= 0:
 					hit_indices.append(next_i)
-					var next_pos: Vector3 = (_enemies[next_i]["pos"] as Vector3) + Vector3(0.0, 0.30, 0.0)
+					var next_pos: Vector3 = (_enemies[next_i]["pos"] as Vector3) + Vector3(0.0, 0.35, 0.0)
 					_spawn_beam_vfx(last_pos, next_pos, 0.07, col, 0.16)
 					last_pos = next_pos
 				else:
@@ -1017,7 +1008,7 @@ func _spawn_damage_label(pos: Vector3, dmg_val: int, col: Color) -> void:
 	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	lbl.modulate = col
 	lbl.outline_size = 4
-	lbl.position = pos + Vector3(0.0, 0.85, 0.0)
+	lbl.position = pos + Vector3(0.0, 1.15, 0.0)
 	_fx_root.add_child(lbl)
 	_float_texts.append({"node": lbl, "ttl": 0.55})
 
@@ -1116,7 +1107,7 @@ func _damage_enemy_at(idx: int, raw_dmg: float, dmg_type: String) -> void:
 		if eid == "splitter":
 			for off_x in [-0.25, 0.25]:
 				var sw: Dictionary = _enemy_catalog.get("swarm", {"hp": 35, "speed": 140, "bounty": 4})
-				var vis: Dictionary = _build_enemy_3d_node("swarm", false, false)
+				var vis: Dictionary = _build_enemy_sprite_node("swarm", false)
 				var snode: Node3D = vis["root"]
 				var spos: Vector3 = death_pos + Vector3(off_x, 0.0, 0.0)
 				snode.position = spos
@@ -1128,7 +1119,7 @@ func _damage_enemy_at(idx: int, raw_dmg: float, dmg_type: String) -> void:
 					"speed": float(sw.get("speed", 140)) * PX_TO_WORLD,
 					"bounty": int(sw.get("bounty", 4)), "is_flying": false, "elite": false,
 					"slow_timer": 0.0, "slow_factor": 1.0, "medic_cd": 99.0, "shield_regen_cd": 0.0,
-					"node": snode, "shield_mesh": null, "hp_bar": vis["hp_bar"]
+					"node": snode, "sprite": vis["sprite"], "hp_bar": vis["hp_bar"]
 				})
 
 
