@@ -1,9 +1,10 @@
 extends Node3D
 
-## 2.5D/3D Изометрический движок Neon Grid Defense (Godot 4.3 GL Compatibility):
-## - Объёмная тёмно-металлическая 3D-доска с Glow/Bloom, оранжевыми 3D-порталами и неоновой трассой
-## - Детализированные 2.5D изометрические спрайты (Sprite3D) для всех 6 башен, 7 врагов и Energy Core
-## - Анимация отдачи башен при выстреле, зеркалирование по направлению цели/движения, 3D-лучи, молнии и урон
+## 3D Изометрический движок Neon Grid Defense v14 (Godot 4.3 GL Compatibility):
+## - 6 стилизованных 3D-башен с раздельной конструкцией (неподвижный пьедестал + поворотная голова на 360°)
+## - Плавное слежение за целью каждый кадр (lerp_angle), отдача стволов и вспышка на срезе ствола
+## - Скруглённые Bezier-траектории на всех поворотах дороги (никаких рывков 90° по клеткам)
+## - 7 упрощённых 3D-врагов с живой процедурной анимацией (шаг ног мехов, поворот башни танка, винты дрона, парение)
 
 signal tower_place_requested(cell: Vector2i, on_boost: bool)
 signal tower_remove_requested(cell: Vector2i, tower_id: String)
@@ -26,7 +27,8 @@ var grid_size := Vector2i(24, 14)
 var current_level_data: Dictionary = {}
 var spawns: Array[Vector2i] = []
 var core_cell := Vector2i(23, 6)
-var fixed_paths: Array = []
+var fixed_paths: Array = []   # Array of Array[Vector2i]
+var smooth_paths: Array = []  # Array of PackedVector3Array (скруглённые Bezier-маршруты)
 var walls: Array[Vector2i] = []
 var boost_tiles: Array[Vector2i] = []
 
@@ -36,10 +38,6 @@ var game_speed: float = 1.0
 var cores_remaining: int = 10
 
 var _enemy_catalog: Dictionary = {}
-var _tower_textures: Dictionary = {} # id -> Texture2D
-var _enemy_textures: Dictionary = {} # id -> Texture2D
-var _core_texture: Texture2D = null
-
 var _cells: Dictionary = {}
 var _placed_towers: Dictionary = {}
 var _boost_set: Dictionary = {}
@@ -57,10 +55,11 @@ var _hover_box: MeshInstance3D
 var _hover_mat: StandardMaterial3D
 var _range_ring: MeshInstance3D
 var _range_mat: StandardMaterial3D
-var _core_sprite: Sprite3D
+var _core_sphere: MeshInstance3D
 var _core_ring_a: MeshInstance3D
 var _core_ring_b: MeshInstance3D
 var _core_light: OmniLight3D
+var _core_mat: StandardMaterial3D
 
 # Combat runtime
 var _waves_data: Array = []
@@ -80,7 +79,6 @@ var _anim_time: float = 0.0
 
 func _ready() -> void:
 	_load_enemy_catalog()
-	_preload_sprites()
 	_setup_environment_and_camera()
 	_setup_containers()
 	SettingsManager.settings_changed.connect(_on_settings_changed)
@@ -98,30 +96,17 @@ func _load_enemy_catalog() -> void:
 			_enemy_catalog[str(e.get("id", ""))] = e
 
 
-func _preload_sprites() -> void:
-	for tid in ["pulse", "cannon", "cryo", "tesla", "laser", "railgun"]:
-		var p: String = "res://assets/sprites/towers/%s.png" % tid
-		if ResourceLoader.exists(p):
-			_tower_textures[tid] = load(p)
-	for eid in ["swarm", "trooper", "armored", "shielded", "medic", "splitter", "drone"]:
-		var p: String = "res://assets/sprites/enemies/%s.png" % eid
-		if ResourceLoader.exists(p):
-			_enemy_textures[eid] = load(p)
-	if ResourceLoader.exists("res://assets/sprites/core.png"):
-		_core_texture = load("res://assets/sprites/core.png")
-
-
 func _setup_environment_and_camera() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
 	env.background_color = Color("#050810")
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("#1E3350")
-	env.ambient_light_energy = 0.55
+	env.ambient_light_color = Color("#243B5C")
+	env.ambient_light_energy = 0.65
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.glow_enabled = true
-	env.glow_intensity = 0.85
-	env.glow_bloom = 0.25
+	env.glow_intensity = 0.90
+	env.glow_bloom = 0.28
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
 
 	var we := WorldEnvironment.new()
@@ -129,14 +114,14 @@ func _setup_environment_and_camera() -> void:
 	add_child(we)
 
 	var sun := DirectionalLight3D.new()
-	sun.light_color = Color("#E0F0FF")
-	sun.light_energy = 1.25
-	sun.rotation_degrees = Vector3(-50.0, 38.0, 0.0)
+	sun.light_color = Color("#E6F2FF")
+	sun.light_energy = 1.35
+	sun.rotation_degrees = Vector3(-52.0, 38.0, 0.0)
 	add_child(sun)
 
 	var rim := DirectionalLight3D.new()
-	rim.light_color = Color("#00A8CC")
-	rim.light_energy = 0.45
+	rim.light_color = Color("#00B8D9")
+	rim.light_energy = 0.50
 	rim.rotation_degrees = Vector3(-28.0, -140.0, 0.0)
 	add_child(rim)
 
@@ -211,7 +196,7 @@ func is_wave_active() -> bool:
 	return _wave_active
 
 
-func _make_mat(col: Color, emission_strength: float = 0.0, alpha: float = 1.0, metallic: float = 0.45, roughness: float = 0.40) -> StandardMaterial3D:
+func _make_mat(col: Color, emission_strength: float = 0.0, alpha: float = 1.0, metallic: float = 0.50, roughness: float = 0.36) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = Color(col.r, col.g, col.b, alpha)
 	m.metallic = metallic
@@ -254,8 +239,11 @@ func load_level_from_file(path: String) -> bool:
 	_waves_data = parsed.get("waves", [])
 
 	fixed_paths.clear()
+	smooth_paths.clear()
 	for raw_p in parsed.get("paths", []):
-		fixed_paths.append(_parse_vec2i_array(raw_p))
+		var cell_arr: Array[Vector2i] = _parse_vec2i_array(raw_p)
+		fixed_paths.append(cell_arr)
+		smooth_paths.append(_build_smooth_bezier_path(cell_arr))
 
 	_hover_cell = Vector2i(-1, -1)
 	_hover_box.visible = false
@@ -279,6 +267,47 @@ func load_level_from_file(path: String) -> bool:
 	level_loaded.emit(current_level_data)
 	wave_state_changed.emit(0, _waves_data.size(), false)
 	return true
+
+
+## Преобразует ломаную из клеток сетки в плавную кривую с закруглёнными поворотами (квадратичный Безье).
+func _build_smooth_bezier_path(cell_path: Array[Vector2i]) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	if cell_path.size() < 2:
+		for c in cell_path:
+			out.append(cell_to_world_3d(c))
+		return out
+
+	# Сначала оставляем только угловые точки (старт, повороты, финиш)
+	var corners: Array[Vector3] = [cell_to_world_3d(cell_path[0])]
+	for i in range(1, cell_path.size() - 1):
+		var d1: Vector2i = cell_path[i] - cell_path[i - 1]
+		var d2: Vector2i = cell_path[i + 1] - cell_path[i]
+		if d1 != d2:
+			corners.append(cell_to_world_3d(cell_path[i]))
+	corners.append(cell_to_world_3d(cell_path[cell_path.size() - 1]))
+
+	out.append(corners[0])
+	var fillet: float = 0.44
+	var steps: int = 6
+
+	for i in range(1, corners.size() - 1):
+		var prev_p: Vector3 = corners[i - 1]
+		var cur_p: Vector3 = corners[i]
+		var next_p: Vector3 = corners[i + 1]
+		var dir_in: Vector3 = (cur_p - prev_p).normalized()
+		var dir_out: Vector3 = (next_p - cur_p).normalized()
+		var r_in: float = minf(fillet, prev_p.distance_to(cur_p) * 0.45)
+		var r_out: float = minf(fillet, cur_p.distance_to(next_p) * 0.45)
+		var p0: Vector3 = cur_p - dir_in * r_in
+		var p2: Vector3 = cur_p + dir_out * r_out
+		for s in range(steps + 1):
+			var t: float = float(s) / float(steps)
+			var u: float = 1.0 - t
+			var pt: Vector3 = u * u * p0 + 2.0 * u * t * cur_p + t * t * p2
+			out.append(pt)
+
+	out.append(corners[corners.size() - 1])
+	return out
 
 
 func _parse_vec2i_array(raw: Array) -> Array[Vector2i]:
@@ -319,7 +348,7 @@ func _build_3d_board() -> void:
 	_clear_node_children(_towers_root)
 	_clear_node_children(_enemies_root)
 	_clear_node_children(_fx_root)
-	_core_sprite = null
+	_core_sphere = null
 	_core_ring_a = null
 	_core_ring_b = null
 	_core_light = null
@@ -337,7 +366,7 @@ func _build_3d_board() -> void:
 	var road_mesh := BoxMesh.new()
 	road_mesh.size = Vector3(0.96, 0.09, 0.96)
 	var wall_mesh := BoxMesh.new()
-	wall_mesh.size = Vector3(0.88, 0.58, 0.88)
+	wall_mesh.size = Vector3(0.88, 0.56, 0.88)
 
 	var mat_empty := _make_mat(Color("#1A263A"), 0.0, 1.0, 0.62, 0.36)
 	var mat_road := _make_mat(Color("#0D1C2E"), 0.10, 1.0, 0.45, 0.45)
@@ -429,31 +458,36 @@ func _build_spawn_portal(pos: Vector3, ring_mat: Material, core_mat: Material) -
 
 
 func _build_energy_core(pos: Vector3) -> void:
+	_core_mat = _make_mat(Color("#00E5FF"), 3.4, 1.0, 0.1, 0.12)
+	_core_sphere = MeshInstance3D.new()
+	var smesh := SphereMesh.new()
+	smesh.radius = 0.46
+	smesh.height = 0.92
+	_core_sphere.mesh = smesh
+	_core_sphere.position = Vector3(pos.x, 0.62, pos.z)
+	_core_sphere.material_override = _core_mat
+	_board_root.add_child(_core_sphere)
+
 	var ring_mat := _make_mat(Color("#00E5FF"), 2.6, 0.88, 0.1, 0.2)
 	_core_ring_a = MeshInstance3D.new()
 	var r1 := TorusMesh.new()
-	r1.inner_radius = 0.80
-	r1.outer_radius = 0.86
+	r1.inner_radius = 0.72
+	r1.outer_radius = 0.78
 	r1.rings = 32
 	_core_ring_a.mesh = r1
-	_core_ring_a.position = Vector3(pos.x, 0.08, pos.z)
+	_core_ring_a.position = Vector3(pos.x, 0.14, pos.z)
 	_core_ring_a.material_override = ring_mat
 	_board_root.add_child(_core_ring_a)
 
 	_core_ring_b = MeshInstance3D.new()
 	var r2 := TorusMesh.new()
-	r2.inner_radius = 1.18
-	r2.outer_radius = 1.24
+	r2.inner_radius = 1.08
+	r2.outer_radius = 1.14
 	r2.rings = 36
 	_core_ring_b.mesh = r2
-	_core_ring_b.position = Vector3(pos.x, 0.04, pos.z)
+	_core_ring_b.position = Vector3(pos.x, 0.08, pos.z)
 	_core_ring_b.material_override = ring_mat
 	_board_root.add_child(_core_ring_b)
-
-	if _core_texture:
-		_core_sprite = _make_billboard_sprite(_core_texture, 0.0085)
-		_core_sprite.position = Vector3(pos.x, 0.95, pos.z)
-		_board_root.add_child(_core_sprite)
 
 	_core_light = OmniLight3D.new()
 	_core_light.light_color = Color("#00E5FF")
@@ -463,30 +497,21 @@ func _build_energy_core(pos: Vector3) -> void:
 	_board_root.add_child(_core_light)
 
 
-func _make_billboard_sprite(tex: Texture2D, px_size: float = 0.0062) -> Sprite3D:
-	var sp := Sprite3D.new()
-	sp.texture = tex
-	sp.pixel_size = px_size
-	sp.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	sp.transparent = true
-	sp.shaded = false
-	sp.alpha_cut = SpriteBase3D.ALPHA_CUT_DISABLED
-	sp.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	return sp
-
-
 func _build_3d_routes() -> void:
 	_clear_node_children(_route_root)
 	var line_mat := _make_mat(Color("#00E5FF"), 3.0, 0.95, 0.1, 0.15)
 	var joint_mesh := SphereMesh.new()
-	joint_mesh.radius = 0.06
-	joint_mesh.height = 0.12
+	joint_mesh.radius = 0.052
+	joint_mesh.height = 0.104
 
-	for path in fixed_paths:
-		for i in range(path.size() - 1):
-			var a: Vector3 = cell_to_world_3d(path[i]) + Vector3(0.0, -0.02, 0.0)
-			var b: Vector3 = cell_to_world_3d(path[i + 1]) + Vector3(0.0, -0.02, 0.0)
-			var seg := _create_beam_mesh(a, b, 0.10, line_mat)
+	for spath in smooth_paths:
+		var pts: PackedVector3Array = spath
+		for i in range(pts.size() - 1):
+			var a: Vector3 = pts[i] + Vector3(0.0, -0.02, 0.0)
+			var b: Vector3 = pts[i + 1] + Vector3(0.0, -0.02, 0.0)
+			if a.distance_to(b) < 0.01:
+				continue
+			var seg := _create_beam_mesh(a, b, 0.095, line_mat)
 			_route_root.add_child(seg)
 			var cap := MeshInstance3D.new()
 			cap.mesh = joint_mesh
@@ -600,22 +625,20 @@ func _handle_right_click(cell: Vector2i) -> void:
 func commit_place_tower(cell: Vector2i, tower_cfg: Dictionary) -> void:
 	_cells[cell] = CellType.TOWER
 	var tid: String = str(tower_cfg.get("id", "pulse"))
-	var root_node := Node3D.new()
+	var col := Color(str(tower_cfg.get("color", "#3B82F6")))
+	var built: Dictionary = _build_rotating_tower(tid, col, _boost_set.has(cell))
+	var root_node: Node3D = built["root"]
 	root_node.position = cell_to_world_3d(cell)
-
-	var sp: Sprite3D = null
-	if _tower_textures.has(tid):
-		sp = _make_billboard_sprite(_tower_textures[tid], 0.0064)
-		sp.position = Vector3(0.0, 0.72, 0.0)
-		root_node.add_child(sp)
-
 	_towers_root.add_child(root_node)
 
 	var runtime_cfg: Dictionary = tower_cfg.duplicate()
 	runtime_cfg["cooldown"] = 0.0
 	runtime_cfg["recoil"] = 0.0
+	runtime_cfg["yaw"] = 0.0
 	runtime_cfg["node"] = root_node
-	runtime_cfg["sprite"] = sp
+	runtime_cfg["head"] = built["head"]
+	runtime_cfg["barrel_group"] = built["barrel_group"]
+	runtime_cfg["muzzle"] = built["muzzle"]
 	_placed_towers[cell] = runtime_cfg
 	_can_place_hover = false
 	_update_hover_visuals()
@@ -632,6 +655,217 @@ func commit_remove_tower(cell: Vector2i) -> void:
 	_can_place_hover = _is_buildable_cell(_hover_cell)
 	_update_hover_visuals()
 	sfx_requested.emit("sell")
+
+
+## Строит стилизованную 3D-башню с неподвижным пьедесталом, поворотной головой на 360° и точкой ствола (muzzle).
+func _build_rotating_tower(tid: String, col: Color, on_boost: bool) -> Dictionary:
+	var root := Node3D.new()
+	var dark_mat := _make_mat(Color("#152033"), 0.0, 1.0, 0.72, 0.35)
+	var steel_mat := _make_mat(Color("#475569"), 0.0, 1.0, 0.80, 0.28)
+	var accent_mat := _make_mat(col, 0.35, 1.0, 0.62, 0.28)
+	var glow_mat := _make_mat(col, 2.8, 1.0, 0.15, 0.15)
+
+	# 1. Неподвижный восьмиугольный пьедестал + неоновое кольцо
+	var ped := MeshInstance3D.new()
+	var pm := CylinderMesh.new()
+	pm.top_radius = 0.38
+	pm.bottom_radius = 0.44
+	pm.height = 0.16
+	pm.radial_segments = 8
+	ped.mesh = pm
+	ped.position.y = 0.08
+	ped.material_override = dark_mat
+	root.add_child(ped)
+
+	var collar := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.28
+	cm.bottom_radius = 0.34
+	cm.height = 0.14
+	cm.radial_segments = 8
+	collar.mesh = cm
+	collar.position.y = 0.22
+	collar.material_override = steel_mat
+	root.add_child(collar)
+
+	var base_ring := MeshInstance3D.new()
+	var brm := TorusMesh.new()
+	brm.inner_radius = 0.35
+	brm.outer_radius = 0.39
+	brm.rings = 16
+	base_ring.mesh = brm
+	base_ring.position.y = 0.16
+	base_ring.material_override = _make_mat(Color("#10B981") if on_boost else col, 2.2, 1.0, 0.2, 0.2)
+	root.add_child(base_ring)
+
+	# 2. Поворотная голова (вращается на 360° по Y вслед за врагом; локальный +Z — направление ствола)
+	var head := Node3D.new()
+	head.position.y = 0.36
+	root.add_child(head)
+
+	var barrel_group := Node3D.new()
+	head.add_child(barrel_group)
+
+	var muzzle := Node3D.new()
+	muzzle.position = Vector3(0.0, 0.08, 0.56)
+	barrel_group.add_child(muzzle)
+
+	match tid:
+		"pulse":
+			var body := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = Vector3(0.38, 0.24, 0.42)
+			body.mesh = bm
+			body.position = Vector3(0.0, 0.08, -0.02)
+			body.material_override = accent_mat
+			head.add_child(body)
+			for sx in [-0.10, 0.10]:
+				var bar := MeshInstance3D.new()
+				var cyl := CylinderMesh.new()
+				cyl.top_radius = 0.042
+				cyl.bottom_radius = 0.052
+				cyl.height = 0.50
+				bar.mesh = cyl
+				bar.rotation_degrees = Vector3(90.0, 0.0, 0.0)
+				bar.position = Vector3(sx, 0.08, 0.34)
+				bar.material_override = steel_mat
+				barrel_group.add_child(bar)
+				var tip := MeshInstance3D.new()
+				var tm := TorusMesh.new()
+				tm.inner_radius = 0.036
+				tm.outer_radius = 0.056
+				tip.mesh = tm
+				tip.rotation_degrees = Vector3(90.0, 0.0, 0.0)
+				tip.position = Vector3(sx, 0.08, 0.58)
+				tip.material_override = glow_mat
+				barrel_group.add_child(tip)
+			muzzle.position = Vector3(0.0, 0.08, 0.62)
+
+		"cannon":
+			var cradle := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = Vector3(0.46, 0.26, 0.44)
+			cradle.mesh = bm
+			cradle.position = Vector3(0.0, 0.08, -0.04)
+			cradle.material_override = accent_mat
+			head.add_child(cradle)
+			var tube := MeshInstance3D.new()
+			var cyl := CylinderMesh.new()
+			cyl.top_radius = 0.12
+			cyl.bottom_radius = 0.16
+			cyl.height = 0.60
+			tube.mesh = cyl
+			tube.rotation_degrees = Vector3(62.0, 0.0, 0.0)
+			tube.position = Vector3(0.0, 0.22, 0.20)
+			tube.material_override = steel_mat
+			barrel_group.add_child(tube)
+			var ring := MeshInstance3D.new()
+			var tm := TorusMesh.new()
+			tm.inner_radius = 0.10
+			tm.outer_radius = 0.145
+			ring.mesh = tm
+			ring.rotation_degrees = Vector3(62.0, 0.0, 0.0)
+			ring.position = Vector3(0.0, 0.34, 0.44)
+			ring.material_override = glow_mat
+			barrel_group.add_child(ring)
+			muzzle.position = Vector3(0.0, 0.38, 0.50)
+
+		"cryo":
+			var crystal := MeshInstance3D.new()
+			var cyl := CylinderMesh.new()
+			cyl.top_radius = 0.01
+			cyl.bottom_radius = 0.22
+			cyl.height = 0.66
+			cyl.radial_segments = 6
+			crystal.mesh = cyl
+			crystal.position = Vector3(0.0, 0.36, 0.0)
+			crystal.material_override = _make_mat(col, 2.6, 0.92, 0.1, 0.1)
+			head.add_child(crystal)
+			var bot_c := MeshInstance3D.new()
+			var cyl2 := CylinderMesh.new()
+			cyl2.top_radius = 0.22
+			cyl2.bottom_radius = 0.01
+			cyl2.height = 0.22
+			cyl2.radial_segments = 6
+			bot_c.mesh = cyl2
+			bot_c.position = Vector3(0.0, -0.06, 0.0)
+			bot_c.material_override = _make_mat(col, 2.2, 0.90, 0.1, 0.1)
+			head.add_child(bot_c)
+			muzzle.position = Vector3(0.0, 0.35, 0.0)
+
+		"tesla":
+			var spire := MeshInstance3D.new()
+			var sm := CylinderMesh.new()
+			sm.top_radius = 0.06
+			sm.bottom_radius = 0.14
+			sm.height = 0.68
+			spire.mesh = sm
+			spire.position.y = 0.26
+			spire.material_override = steel_mat
+			head.add_child(spire)
+			for idx in 3:
+				var r := MeshInstance3D.new()
+				var tm := TorusMesh.new()
+				tm.inner_radius = 0.22 - float(idx) * 0.035
+				tm.outer_radius = 0.26 - float(idx) * 0.035
+				r.mesh = tm
+				r.position.y = 0.14 + float(idx) * 0.16
+				r.material_override = glow_mat
+				head.add_child(r)
+			var orb := MeshInstance3D.new()
+			var om := SphereMesh.new()
+			om.radius = 0.15
+			om.height = 0.30
+			orb.mesh = om
+			orb.position.y = 0.68
+			orb.material_override = _make_mat(col, 3.2, 1.0, 0.1, 0.1)
+			head.add_child(orb)
+			muzzle.position = Vector3(0.0, 0.68, 0.0)
+
+		"laser":
+			var housing := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = Vector3(0.34, 0.30, 0.54)
+			housing.mesh = bm
+			housing.position = Vector3(0.0, 0.12, 0.0)
+			housing.material_override = accent_mat
+			barrel_group.add_child(housing)
+			var lens := MeshInstance3D.new()
+			var lm := SphereMesh.new()
+			lm.radius = 0.13
+			lm.height = 0.26
+			lens.mesh = lm
+			lens.position = Vector3(0.0, 0.12, 0.28)
+			lens.material_override = glow_mat
+			barrel_group.add_child(lens)
+			muzzle.position = Vector3(0.0, 0.12, 0.38)
+
+		"railgun":
+			var core_box := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = Vector3(0.34, 0.22, 0.48)
+			core_box.mesh = bm
+			core_box.position = Vector3(0.0, 0.10, -0.06)
+			core_box.material_override = steel_mat
+			head.add_child(core_box)
+			for sx in [-0.10, 0.10]:
+				var rail := MeshInstance3D.new()
+				var rm := BoxMesh.new()
+				rm.size = Vector3(0.07, 0.12, 0.92)
+				rail.mesh = rm
+				rail.position = Vector3(sx, 0.12, 0.30)
+				rail.material_override = accent_mat
+				barrel_group.add_child(rail)
+			var energy := MeshInstance3D.new()
+			var em := BoxMesh.new()
+			em.size = Vector3(0.06, 0.06, 0.78)
+			energy.mesh = em
+			energy.position = Vector3(0.0, 0.12, 0.28)
+			energy.material_override = _make_mat(Color("#FEF08A"), 3.0, 1.0, 0.1, 0.1)
+			barrel_group.add_child(energy)
+			muzzle.position = Vector3(0.0, 0.12, 0.78)
+
+	return {"root": root, "head": head, "barrel_group": barrel_group, "muzzle": muzzle}
 
 
 func start_next_wave() -> bool:
@@ -653,7 +887,7 @@ func start_next_wave() -> bool:
 		var delay: float = float(grp.get("delay", 0.0))
 		var elite: bool = bool(grp.get("elite", false))
 		for i in cnt:
-			var pidx: int = _round_robin_spawn % max(fixed_paths.size(), 1)
+			var pidx: int = _round_robin_spawn % max(smooth_paths.size(), 1)
 			_round_robin_spawn += 1
 			_spawn_queue.append({
 				"time": delay + float(i) * interval,
@@ -674,8 +908,8 @@ func start_next_wave() -> bool:
 
 func _process(delta: float) -> void:
 	_anim_time += delta
-	if is_instance_valid(_core_sprite):
-		_core_sprite.position.y = 0.95 + sin(_anim_time * 2.5) * 0.07
+	if is_instance_valid(_core_sphere):
+		_core_sphere.position.y = 0.62 + sin(_anim_time * 2.6) * 0.08
 	if is_instance_valid(_core_ring_a):
 		_core_ring_a.rotation.y = _anim_time * 1.1
 	if is_instance_valid(_core_ring_b):
@@ -683,13 +917,17 @@ func _process(delta: float) -> void:
 
 	if _core_flash > 0.0:
 		_core_flash = maxf(0.0, _core_flash - delta * 2.5)
-		var c := Color("#FF3B5C") if _core_flash > 0.2 else Color.WHITE
-		if is_instance_valid(_core_sprite):
-			_core_sprite.modulate = c
-		if is_instance_valid(_core_light):
-			_core_light.light_color = Color("#FF3B5C") if _core_flash > 0.2 else Color("#00E5FF")
+		if _core_mat:
+			var c := Color("#FF3B5C") if _core_flash > 0.2 else Color("#00E5FF")
+			_core_mat.albedo_color = c
+			_core_mat.emission = c
+			if is_instance_valid(_core_light):
+				_core_light.light_color = c
 
 	var dt: float = delta * game_speed
+	# Анимация башен (кристалл Cryo и плавный возврат отдачи) работает всегда
+	_animate_idle_towers(dt)
+
 	if _wave_active and not _ended:
 		_wave_time += dt
 		_process_spawns()
@@ -700,6 +938,21 @@ func _process(delta: float) -> void:
 
 	_process_vfx(delta)
 	_process_float_texts(delta)
+
+
+func _animate_idle_towers(dt: float) -> void:
+	for cell: Vector2i in _placed_towers:
+		var t: Dictionary = _placed_towers[cell]
+		var tid: String = str(t.get("id", "pulse"))
+		var head: Node3D = t.get("head", null)
+		var bg: Node3D = t.get("barrel_group", null)
+		if tid == "cryo" and is_instance_valid(head):
+			head.rotation.y += dt * 1.5
+			head.position.y = 0.36 + sin(_anim_time * 3.0 + float(cell.x)) * 0.05
+		if float(t["recoil"]) > 0.0:
+			t["recoil"] = maxf(0.0, float(t["recoil"]) - dt * 7.0)
+			if is_instance_valid(bg):
+				bg.position.z = -float(t["recoil"]) * 0.14
 
 
 func _process_spawns() -> void:
@@ -713,53 +966,267 @@ func _spawn_enemy(item: Dictionary) -> void:
 	var base: Dictionary = _enemy_catalog.get(eid, {"hp": 80, "shield": 0, "armor": 0, "speed": 90, "bounty": 8, "is_flying": false})
 	var hp_mult: float = float(item["hp_mult"])
 	var pidx: int = int(item["path_idx"])
-	var path_cells: Array = fixed_paths[pidx] if pidx < fixed_paths.size() else [core_cell]
+	var pts: PackedVector3Array = smooth_paths[pidx] if pidx < smooth_paths.size() else PackedVector3Array([cell_to_world_3d(core_cell)])
 	var is_flying: bool = bool(base.get("is_flying", false))
-	var start_pos: Vector3 = cell_to_world_3d(path_cells[0]) + Vector3(0.0, 1.15 if is_flying else 0.02, 0.0)
+	var start_pos: Vector3 = pts[0] + Vector3(0.0, 1.15 if is_flying else 0.02, 0.0)
 	var max_hp: float = float(base.get("hp", 80)) * hp_mult
 	var max_shield: float = float(base.get("shield", 0)) * hp_mult
 	var elite: bool = bool(item.get("elite", false))
 
-	var visual: Dictionary = _build_enemy_sprite_node(eid, elite)
+	var visual: Dictionary = _build_animated_enemy(eid, elite, max_shield > 0.0)
 	var node: Node3D = visual["root"]
 	node.position = start_pos
 	_enemies_root.add_child(node)
 
+	var init_yaw: float = 0.0
+	if pts.size() >= 2:
+		var d: Vector3 = pts[1] - pts[0]
+		init_yaw = atan2(d.x, d.z)
+	node.rotation.y = init_yaw
+
 	_enemies.append({
 		"id": eid, "pos": start_pos, "path_idx": pidx, "wp_idx": 1, "progress": 0.0,
+		"yaw": init_yaw, "walk_phase": randf() * TAU,
 		"hp": max_hp, "max_hp": max_hp, "shield": max_shield, "max_shield": max_shield,
 		"armor": float(base.get("armor", 0)), "speed": float(base.get("speed", 90)) * PX_TO_WORLD,
 		"bounty": int(base.get("bounty", 8)), "is_flying": is_flying, "elite": elite,
 		"slow_timer": 0.0, "slow_factor": 1.0, "medic_cd": 2.0, "shield_regen_cd": 0.0,
-		"node": node, "sprite": visual["sprite"], "hp_bar": visual["hp_bar"]
+		"node": node, "parts": visual["parts"], "shield_mesh": visual["shield"], "hp_bar": visual["hp_bar"]
 	})
 
 
-func _build_enemy_sprite_node(eid: String, elite: bool) -> Dictionary:
+## Строит упрощённого 3D-врага с подвижными частями для естественной анимации ходьбы/полёта.
+func _build_animated_enemy(eid: String, elite: bool, has_shield: bool) -> Dictionary:
 	var root := Node3D.new()
+	var body_pivot := Node3D.new()
+	root.add_child(body_pivot)
 	var sc: float = 1.25 if elite else 1.0
-	var px: float = 0.0056 * sc
-	if eid == "swarm":
-		px = 0.0042 * sc
-	elif eid == "armored" or eid == "shielded":
-		px = 0.0066 * sc
+	body_pivot.scale = Vector3(sc, sc, sc)
 
-	var sp: Sprite3D = null
-	if _enemy_textures.has(eid):
-		sp = _make_billboard_sprite(_enemy_textures[eid], px)
-		sp.position = Vector3(0.0, 0.62 * sc, 0.0)
-		root.add_child(sp)
+	var parts: Dictionary = {"pivot": body_pivot}
+	var steel := _make_mat(Color("#475569"), 0.0, 1.0, 0.78, 0.30)
+	var dark := _make_mat(Color("#1E293B"), 0.0, 1.0, 0.65, 0.45)
+
+	match eid:
+		"swarm":
+			var hull := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = Vector3(0.28, 0.14, 0.38)
+			hull.mesh = bm
+			hull.position.y = 0.22
+			hull.material_override = _make_mat(Color("#BE123C"), 0.3, 1.0, 0.6, 0.3)
+			body_pivot.add_child(hull)
+			var thrust := MeshInstance3D.new()
+			var sm := SphereMesh.new()
+			sm.radius = 0.09
+			sm.height = 0.18
+			thrust.mesh = sm
+			thrust.position = Vector3(0.0, 0.22, -0.22)
+			thrust.material_override = _make_mat(Color("#FB7185"), 2.8, 1.0, 0.1, 0.1)
+			body_pivot.add_child(thrust)
+			parts["thruster"] = thrust
+
+		"trooper":
+			var red := _make_mat(Color("#DC2626"), 0.25, 1.0, 0.55, 0.32)
+			var visor := _make_mat(Color("#F97316"), 2.8, 1.0, 0.1, 0.1)
+			var leg_l := _make_leg(steel, Vector3(-0.10, 0.24, 0.0), 0.24)
+			var leg_r := _make_leg(steel, Vector3(0.10, 0.24, 0.0), 0.24)
+			body_pivot.add_child(leg_l)
+			body_pivot.add_child(leg_r)
+			var torso := Node3D.new()
+			torso.position.y = 0.36
+			body_pivot.add_child(torso)
+			var chest := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = Vector3(0.28, 0.24, 0.20)
+			chest.mesh = bm
+			chest.material_override = red
+			torso.add_child(chest)
+			var head_m := MeshInstance3D.new()
+			var hm := BoxMesh.new()
+			hm.size = Vector3(0.17, 0.14, 0.17)
+			head_m.mesh = hm
+			head_m.position = Vector3(0.0, 0.19, 0.01)
+			head_m.material_override = steel
+			torso.add_child(head_m)
+			var v := MeshInstance3D.new()
+			var vm := BoxMesh.new()
+			vm.size = Vector3(0.13, 0.05, 0.04)
+			v.mesh = vm
+			v.position = Vector3(0.0, 0.20, 0.09)
+			v.material_override = visor
+			torso.add_child(v)
+			parts["leg_l"] = leg_l
+			parts["leg_r"] = leg_r
+			parts["torso"] = torso
+
+		"armored":
+			for sx in [-0.24, 0.24]:
+				var tread := MeshInstance3D.new()
+				var tm := BoxMesh.new()
+				tm.size = Vector3(0.12, 0.18, 0.66)
+				tread.mesh = tm
+				tread.position = Vector3(sx, 0.09, 0.0)
+				tread.material_override = dark
+				body_pivot.add_child(tread)
+			var hull := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = Vector3(0.42, 0.18, 0.56)
+			hull.mesh = bm
+			hull.position.y = 0.18
+			hull.material_override = steel
+			body_pivot.add_child(hull)
+			var turret := Node3D.new()
+			turret.position.y = 0.33
+			body_pivot.add_child(turret)
+			var cap := MeshInstance3D.new()
+			var cm := BoxMesh.new()
+			cm.size = Vector3(0.30, 0.14, 0.32)
+			cap.mesh = cm
+			cap.material_override = steel
+			turret.add_child(cap)
+			var gun := MeshInstance3D.new()
+			var gm := CylinderMesh.new()
+			gm.top_radius = 0.04
+			gm.bottom_radius = 0.05
+			gm.height = 0.42
+			gun.mesh = gm
+			gun.rotation_degrees = Vector3(90.0, 0.0, 0.0)
+			gun.position = Vector3(0.0, 0.01, 0.30)
+			gun.material_override = dark
+			turret.add_child(gun)
+			var slit := MeshInstance3D.new()
+			var sm := BoxMesh.new()
+			sm.size = Vector3(0.20, 0.04, 0.04)
+			slit.mesh = sm
+			slit.position = Vector3(0.0, 0.21, 0.28)
+			slit.material_override = _make_mat(Color("#EF4444"), 2.4, 1.0, 0.1, 0.1)
+			body_pivot.add_child(slit)
+			parts["turret"] = turret
+
+		"shielded":
+			var purp := _make_mat(Color("#7E22CE"), 0.3, 1.0, 0.6, 0.3)
+			var leg_l := _make_leg(dark, Vector3(-0.13, 0.26, 0.0), 0.26)
+			var leg_r := _make_leg(dark, Vector3(0.13, 0.26, 0.0), 0.26)
+			body_pivot.add_child(leg_l)
+			body_pivot.add_child(leg_r)
+			var torso := Node3D.new()
+			torso.position.y = 0.42
+			body_pivot.add_child(torso)
+			var chest := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = Vector3(0.40, 0.30, 0.28)
+			chest.mesh = bm
+			chest.material_override = purp
+			torso.add_child(chest)
+			var eye := MeshInstance3D.new()
+			var em := BoxMesh.new()
+			em.size = Vector3(0.18, 0.07, 0.05)
+			eye.mesh = em
+			eye.position = Vector3(0.0, 0.04, 0.15)
+			eye.material_override = _make_mat(Color("#38BDF8"), 2.8, 1.0, 0.1, 0.1)
+			torso.add_child(eye)
+			parts["leg_l"] = leg_l
+			parts["leg_r"] = leg_r
+			parts["torso"] = torso
+
+		"medic":
+			var van := MeshInstance3D.new()
+			var vm := BoxMesh.new()
+			vm.size = Vector3(0.42, 0.24, 0.56)
+			van.mesh = vm
+			van.position.y = 0.22
+			van.material_override = steel
+			body_pivot.add_child(van)
+			var beacon := Node3D.new()
+			beacon.position.y = 0.40
+			body_pivot.add_child(beacon)
+			var gmat := _make_mat(Color("#22C55E"), 2.8, 1.0, 0.1, 0.1)
+			for sz in [Vector3(0.24, 0.06, 0.08), Vector3(0.08, 0.06, 0.24)]:
+				var bar := MeshInstance3D.new()
+				var bm := BoxMesh.new()
+				bm.size = sz
+				bar.mesh = bm
+				bar.material_override = gmat
+				beacon.add_child(bar)
+			parts["beacon"] = beacon
+
+		"splitter":
+			var gold_mat := _make_mat(Color("#D97706"), 0.35, 1.0, 0.7, 0.28)
+			var core_m := MeshInstance3D.new()
+			var cm := BoxMesh.new()
+			cm.size = Vector3(0.24, 0.24, 0.24)
+			core_m.mesh = cm
+			core_m.position.y = 0.36
+			core_m.material_override = _make_mat(Color("#FACC15"), 2.8, 1.0, 0.1, 0.1)
+			body_pivot.add_child(core_m)
+			for sx in [-0.22, 0.22]:
+				var plate := MeshInstance3D.new()
+				var pm := BoxMesh.new()
+				pm.size = Vector3(0.12, 0.30, 0.26)
+				plate.mesh = pm
+				plate.position = Vector3(sx, 0.34, 0.0)
+				plate.material_override = gold_mat
+				body_pivot.add_child(plate)
+			parts["core"] = core_m
+
+		"drone":
+			var hull := MeshInstance3D.new()
+			var hm := BoxMesh.new()
+			hm.size = Vector3(0.26, 0.12, 0.36)
+			hull.mesh = hm
+			hull.material_override = _make_mat(Color("#0284C7"), 0.3, 1.0, 0.65, 0.3)
+			body_pivot.add_child(hull)
+			var rmat := _make_mat(Color("#38BDF8"), 2.8, 0.9, 0.1, 0.1)
+			var rotors: Array[Node3D] = []
+			for sx in [-0.26, 0.26]:
+				for sz in [-0.22, 0.22]:
+					var r := MeshInstance3D.new()
+					var tm := TorusMesh.new()
+					tm.inner_radius = 0.08
+					tm.outer_radius = 0.115
+					tm.rings = 12
+					r.mesh = tm
+					r.position = Vector3(sx, 0.05, sz)
+					r.material_override = rmat
+					body_pivot.add_child(r)
+					rotors.append(r)
+			parts["rotors"] = rotors
+
+	var shield_mesh: MeshInstance3D = null
+	if has_shield:
+		shield_mesh = MeshInstance3D.new()
+		var shm := SphereMesh.new()
+		shm.radius = 0.48 * sc
+		shm.height = 0.96 * sc
+		shield_mesh.mesh = shm
+		shield_mesh.position.y = 0.36 * sc
+		shield_mesh.material_override = _make_mat(Color("#38BDF8"), 1.6, 0.28, 0.1, 0.1)
+		root.add_child(shield_mesh)
 
 	var hp_bar := MeshInstance3D.new()
 	var hbm := BoxMesh.new()
-	hbm.size = Vector3(0.68, 0.07, 0.07)
+	hbm.size = Vector3(0.62, 0.07, 0.07)
 	hp_bar.mesh = hbm
-	hp_bar.position = Vector3(0.0, 1.25 * sc, 0.0)
+	hp_bar.position = Vector3(0.0, 0.85 * sc, 0.0)
 	hp_bar.material_override = _make_mat(Color("#22C55E"), 1.8, 1.0, 0.0, 0.5)
 	hp_bar.visible = false
 	root.add_child(hp_bar)
 
-	return {"root": root, "sprite": sp, "hp_bar": hp_bar}
+	return {"root": root, "parts": parts, "shield": shield_mesh, "hp_bar": hp_bar}
+
+
+func _make_leg(mat: Material, hip_pos: Vector3, length: float) -> Node3D:
+	var hip := Node3D.new()
+	hip.position = hip_pos
+	var m := MeshInstance3D.new()
+	var bm := BoxMesh.new()
+	bm.size = Vector3(0.09, length, 0.11)
+	m.mesh = bm
+	m.position.y = -length * 0.5
+	m.material_override = mat
+	hip.add_child(m)
+	return hip
 
 
 func _process_enemies(dt: float) -> void:
@@ -767,20 +1234,18 @@ func _process_enemies(dt: float) -> void:
 	var i: int = _enemies.size() - 1
 	while i >= 0:
 		var e: Dictionary = _enemies[i]
-		var sp: Sprite3D = e["sprite"]
 		if float(e["slow_timer"]) > 0.0:
 			e["slow_timer"] = float(e["slow_timer"]) - dt
 			if float(e["slow_timer"]) <= 0.0:
 				e["slow_factor"] = 1.0
-			if is_instance_valid(sp):
-				sp.modulate = Color("#7DD3FC")
-		elif is_instance_valid(sp):
-			sp.modulate = Color.WHITE
 
 		if float(e["max_shield"]) > 0.0:
 			e["shield_regen_cd"] = maxf(0.0, float(e["shield_regen_cd"]) - dt)
 			if float(e["shield_regen_cd"]) <= 0.0 and float(e["shield"]) < float(e["max_shield"]):
 				e["shield"] = minf(float(e["max_shield"]), float(e["shield"]) + float(e["max_shield"]) * 0.12 * dt)
+			var sm: MeshInstance3D = e["shield_mesh"]
+			if is_instance_valid(sm):
+				sm.visible = float(e["shield"]) > 0.5
 
 		if str(e["id"]) == "medic":
 			e["medic_cd"] = float(e["medic_cd"]) - dt
@@ -793,46 +1258,92 @@ func _process_enemies(dt: float) -> void:
 		var spd: float = float(e["speed"]) * float(e["slow_factor"])
 		var reached_core: bool = false
 		var cur_pos: Vector3 = e["pos"]
-		var target_pos: Vector3 = core_pos
+		var move_dir := Vector3.FORWARD
 
 		if bool(e["is_flying"]):
-			target_pos = core_pos + Vector3(0.0, 1.15, 0.0)
-			var dir: Vector3 = target_pos - cur_pos
-			var dist: float = dir.length()
+			var target_pos: Vector3 = core_pos + Vector3(0.0, 1.15, 0.0)
+			var diff: Vector3 = target_pos - cur_pos
+			var dist: float = diff.length()
 			if dist <= spd * dt + 0.15:
 				reached_core = true
 			else:
-				cur_pos += dir.normalized() * spd * dt
+				move_dir = diff.normalized()
+				cur_pos += move_dir * spd * dt
 				e["progress"] = float(e["progress"]) + spd * dt
 		else:
-			var path_cells: Array = fixed_paths[int(e["path_idx"])]
-			var wp_idx: int = int(e["wp_idx"])
-			if wp_idx >= path_cells.size():
-				reached_core = true
-			else:
-				target_pos = cell_to_world_3d(path_cells[wp_idx]) + Vector3(0.0, 0.02, 0.0)
-				var dir: Vector3 = target_pos - cur_pos
-				var dist: float = dir.length()
-				if dist <= spd * dt:
+			var pts: PackedVector3Array = smooth_paths[int(e["path_idx"])]
+			var step_left: float = spd * dt
+			while step_left > 0.0001:
+				var wp_idx: int = int(e["wp_idx"])
+				if wp_idx >= pts.size():
+					reached_core = true
+					break
+				var target_pos: Vector3 = pts[wp_idx] + Vector3(0.0, 0.02, 0.0)
+				var diff: Vector3 = target_pos - cur_pos
+				var dist: float = diff.length()
+				if dist <= step_left:
+					if dist > 0.001:
+						move_dir = diff / dist
 					cur_pos = target_pos
-					e["wp_idx"] = wp_idx + 1
+					step_left -= dist
 					e["progress"] = float(e["progress"]) + dist
-					if int(e["wp_idx"]) >= path_cells.size():
+					e["wp_idx"] = wp_idx + 1
+					if int(e["wp_idx"]) >= pts.size():
 						reached_core = true
+						break
 				else:
-					cur_pos += dir.normalized() * spd * dt
-					e["progress"] = float(e["progress"]) + spd * dt
+					move_dir = diff / dist
+					cur_pos += move_dir * step_left
+					e["progress"] = float(e["progress"]) + step_left
+					step_left = 0.0
 
 		e["pos"] = cur_pos
+		var walk_phase: float = float(e["walk_phase"]) + dt * spd * 4.2
+		e["walk_phase"] = walk_phase
+
 		var node: Node3D = e["node"]
 		if is_instance_valid(node):
 			node.position = cur_pos
-			if bool(e["is_flying"]):
-				node.position.y = 1.15 + sin(_anim_time * 4.0 + float(i)) * 0.10
-		if is_instance_valid(sp):
-			var move_dx: float = target_pos.x - cur_pos.x
-			if absf(move_dx) > 0.05:
-				sp.flip_h = move_dx < 0.0
+			var desired_yaw: float = atan2(move_dir.x, move_dir.z)
+			var prev_yaw: float = float(e["yaw"])
+			var new_yaw: float = lerp_angle(prev_yaw, desired_yaw, minf(1.0, dt * 10.0))
+			var turn_delta: float = angle_difference(prev_yaw, new_yaw)
+			e["yaw"] = new_yaw
+			node.rotation.y = new_yaw
+
+			# Процедурная анимация частей каждого архетипа
+			var parts: Dictionary = e["parts"]
+			var pivot: Node3D = parts["pivot"]
+			pivot.rotation.z = clampf(-turn_delta * 2.5, -0.22, 0.22)
+			var eid: String = str(e["id"])
+			if eid == "trooper" or eid == "shielded":
+				var leg_l: Node3D = parts["leg_l"]
+				var leg_r: Node3D = parts["leg_r"]
+				var torso: Node3D = parts["torso"]
+				leg_l.rotation.x = sin(walk_phase) * 0.55
+				leg_r.rotation.x = -sin(walk_phase) * 0.55
+				torso.position.y = (0.36 if eid == "trooper" else 0.42) + absf(sin(walk_phase)) * 0.05
+			elif eid == "armored":
+				var turret: Node3D = parts["turret"]
+				turret.rotation.y = sin(_anim_time * 1.4 + float(i)) * 0.45
+			elif eid == "swarm":
+				pivot.position.x = sin(walk_phase * 1.3) * 0.14
+				pivot.position.y = 0.04 + sin(walk_phase * 2.0) * 0.04
+			elif eid == "medic":
+				pivot.position.y = 0.03 + sin(_anim_time * 3.5 + float(i)) * 0.03
+				var beacon: Node3D = parts["beacon"]
+				beacon.rotation.y += dt * 3.2
+			elif eid == "splitter":
+				var core_m: Node3D = parts["core"]
+				core_m.rotation.y += dt * 2.8
+				core_m.rotation.x += dt * 1.6
+				pivot.position.y = 0.04 + sin(_anim_time * 3.2 + float(i)) * 0.05
+			elif eid == "drone":
+				pivot.position.y = sin(_anim_time * 4.5 + float(i)) * 0.09
+				pivot.rotation.x = 0.12
+				var rotors: Array = parts["rotors"]
+				for r in rotors:
+					(r as Node3D).rotation.y += dt * 14.0
 
 		if reached_core:
 			if is_instance_valid(node):
@@ -853,35 +1364,34 @@ func _process_enemies(dt: float) -> void:
 func _process_towers(dt: float) -> void:
 	for cell: Vector2i in _placed_towers:
 		var t: Dictionary = _placed_towers[cell]
-		var sp: Sprite3D = t.get("sprite", null)
-		if float(t["recoil"]) > 0.0:
-			t["recoil"] = maxf(0.0, float(t["recoil"]) - dt * 5.0)
-			if is_instance_valid(sp):
-				var s: float = 1.0 + float(t["recoil"]) * 0.14
-				sp.scale = Vector3(s, s, s)
+		var tid: String = str(t.get("id", "pulse"))
+		var head: Node3D = t.get("head", null)
+		var muzzle: Node3D = t.get("muzzle", null)
 
-		t["cooldown"] = maxf(0.0, float(t["cooldown"]) - dt)
-		if float(t["cooldown"]) > 0.0:
-			continue
-
-		var t_pos: Vector3 = cell_to_world_3d(cell) + Vector3(0.0, 0.55, 0.0)
+		var t_pos: Vector3 = cell_to_world_3d(cell) + Vector3(0.0, 0.45, 0.0)
 		var rng: float = float(t.get("range", 180.0)) * PX_TO_WORLD
 		var target_idx: int = _find_target_index(t_pos, rng)
-		if target_idx < 0:
+
+		# Плавное постоянное наведение башни на цель КАЖДЫЙ КАДР (даже во время перезарядки!)
+		if target_idx >= 0 and is_instance_valid(head) and tid != "cryo" and tid != "tesla":
+			var ep: Vector3 = _enemies[target_idx]["pos"]
+			var desired_yaw: float = atan2(ep.x - t_pos.x, ep.z - t_pos.z)
+			var cur_yaw: float = float(t["yaw"])
+			var new_yaw: float = lerp_angle(cur_yaw, desired_yaw, minf(1.0, dt * 11.0))
+			t["yaw"] = new_yaw
+			head.rotation.y = new_yaw
+
+		t["cooldown"] = maxf(0.0, float(t["cooldown"]) - dt)
+		if float(t["cooldown"]) > 0.0 or target_idx < 0:
 			continue
 
 		var fire_rate: float = maxf(0.1, float(t.get("fire_rate", 1.0)))
 		t["cooldown"] = 1.0 / fire_rate
 		t["recoil"] = 1.0
 		var dmg: float = float(t.get("damage", 12.0)) * (1.2 if _boost_set.has(cell) else 1.0)
-		var tid: String = str(t.get("id", "pulse"))
-		var target: Dictionary = _enemies[target_idx]
-		var e_pos: Vector3 = target["pos"]
+		var fire_origin: Vector3 = muzzle.global_position if is_instance_valid(muzzle) else t_pos
 
-		if is_instance_valid(sp) and tid != "cryo" and tid != "tesla":
-			sp.flip_h = (e_pos.x < t_pos.x)
-
-		_fire_tower(tid, t, t_pos, target_idx, dmg)
+		_fire_tower(tid, t, fire_origin, target_idx, dmg)
 
 
 func _find_target_index(origin: Vector3, rng: float) -> int:
@@ -900,16 +1410,19 @@ func _find_target_index(origin: Vector3, rng: float) -> int:
 
 func _fire_tower(tid: String, cfg: Dictionary, origin: Vector3, target_idx: int, dmg: float) -> void:
 	var target: Dictionary = _enemies[target_idx]
-	var t_pos: Vector3 = (target["pos"] as Vector3) + Vector3(0.0, 0.35, 0.0)
+	var t_pos: Vector3 = (target["pos"] as Vector3) + Vector3(0.0, 0.30, 0.0)
 	var col := Color(str(cfg.get("color", "#00E5FF")))
+
+	# Вспышка на срезе ствола
+	_spawn_muzzle_flash(origin, col)
 
 	match tid:
 		"pulse":
 			sfx_requested.emit("pulse")
-			_spawn_projectile(origin, t_pos, 11.5, dmg, "kinetic", 0.0, col)
+			_spawn_projectile(origin, t_pos, 12.0, dmg, "kinetic", 0.0, col)
 		"cannon":
 			sfx_requested.emit("cannon")
-			_spawn_projectile(origin, t_pos, 7.2, dmg, "explosive", float(cfg.get("aoe_radius", 72.0)) * PX_TO_WORLD, col)
+			_spawn_projectile(origin, t_pos, 7.5, dmg, "explosive", float(cfg.get("aoe_radius", 72.0)) * PX_TO_WORLD, col)
 		"cryo":
 			sfx_requested.emit("cryo")
 			var rng: float = float(cfg.get("range", 170.0)) * PX_TO_WORLD
@@ -929,7 +1442,7 @@ func _fire_tower(tid: String, cfg: Dictionary, origin: Vector3, target_idx: int,
 			var max_chains: int = int(cfg.get("chain_count", 3))
 			var hit_indices: Array[int] = [target_idx]
 			var last_pos: Vector3 = t_pos
-			_spawn_beam_vfx(origin + Vector3(0.0, 0.55, 0.0), t_pos, 0.08, col, 0.16)
+			_spawn_beam_vfx(origin, t_pos, 0.075, col, 0.16)
 			for _c in range(max_chains - 1):
 				var next_i: int = -1
 				var best_d: float = 3.2
@@ -942,8 +1455,8 @@ func _fire_tower(tid: String, cfg: Dictionary, origin: Vector3, target_idx: int,
 						next_i = j
 				if next_i >= 0:
 					hit_indices.append(next_i)
-					var next_pos: Vector3 = (_enemies[next_i]["pos"] as Vector3) + Vector3(0.0, 0.35, 0.0)
-					_spawn_beam_vfx(last_pos, next_pos, 0.07, col, 0.16)
+					var next_pos: Vector3 = (_enemies[next_i]["pos"] as Vector3) + Vector3(0.0, 0.30, 0.0)
+					_spawn_beam_vfx(last_pos, next_pos, 0.065, col, 0.16)
 					last_pos = next_pos
 				else:
 					break
@@ -960,6 +1473,18 @@ func _fire_tower(tid: String, cfg: Dictionary, origin: Vector3, target_idx: int,
 			sfx_requested.emit("railgun")
 			_spawn_beam_vfx(origin, t_pos, 0.11, col, 0.24)
 			_damage_enemy_at(target_idx, dmg, "pierce")
+
+
+func _spawn_muzzle_flash(pos: Vector3, col: Color) -> void:
+	var mi := MeshInstance3D.new()
+	var sm := SphereMesh.new()
+	sm.radius = 0.14
+	sm.height = 0.28
+	mi.mesh = sm
+	mi.position = pos
+	mi.material_override = _make_mat(col.lightened(0.4), 3.6, 0.95, 0.0, 0.1)
+	_fx_root.add_child(mi)
+	_vfx.append({"node": mi, "type": "beam", "ttl": 0.07, "max_ttl": 0.07})
 
 
 func _spawn_projectile(origin: Vector3, dest: Vector3, spd: float, dmg: float, dtype: String, aoe: float, col: Color) -> void:
@@ -1008,7 +1533,7 @@ func _spawn_damage_label(pos: Vector3, dmg_val: int, col: Color) -> void:
 	lbl.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	lbl.modulate = col
 	lbl.outline_size = 4
-	lbl.position = pos + Vector3(0.0, 1.15, 0.0)
+	lbl.position = pos + Vector3(0.0, 0.95, 0.0)
 	_fx_root.add_child(lbl)
 	_float_texts.append({"node": lbl, "ttl": 0.55})
 
@@ -1107,19 +1632,20 @@ func _damage_enemy_at(idx: int, raw_dmg: float, dmg_type: String) -> void:
 		if eid == "splitter":
 			for off_x in [-0.25, 0.25]:
 				var sw: Dictionary = _enemy_catalog.get("swarm", {"hp": 35, "speed": 140, "bounty": 4})
-				var vis: Dictionary = _build_enemy_sprite_node("swarm", false)
+				var vis: Dictionary = _build_animated_enemy("swarm", false, false)
 				var snode: Node3D = vis["root"]
 				var spos: Vector3 = death_pos + Vector3(off_x, 0.0, 0.0)
 				snode.position = spos
 				_enemies_root.add_child(snode)
 				_enemies.append({
 					"id": "swarm", "pos": spos, "path_idx": pidx, "wp_idx": wp_idx, "progress": prog,
+					"yaw": float(e["yaw"]), "walk_phase": randf() * TAU,
 					"hp": float(sw.get("hp", 35)), "max_hp": float(sw.get("hp", 35)),
 					"shield": 0.0, "max_shield": 0.0, "armor": 0.0,
 					"speed": float(sw.get("speed", 140)) * PX_TO_WORLD,
 					"bounty": int(sw.get("bounty", 4)), "is_flying": false, "elite": false,
 					"slow_timer": 0.0, "slow_factor": 1.0, "medic_cd": 99.0, "shield_regen_cd": 0.0,
-					"node": snode, "sprite": vis["sprite"], "hp_bar": vis["hp_bar"]
+					"node": snode, "parts": vis["parts"], "shield_mesh": null, "hp_bar": vis["hp_bar"]
 				})
 
 
