@@ -5,16 +5,20 @@ extends CanvasLayer
 ## 1. Первичная страница настроек (выбор из 7 языков, громкость, опции)
 ## 2. Страница "Как играть" с цветовой легендой клеток и управлением
 ## 3. Окно выбора из 20 уровней кампании
-## 4. Верхний игровой HUD с кнопками быстрого доступа
+## 4. Верхний игровой HUD + Нижняя панель доступных на уровне башен со статами
 
 signal play_requested()
 signal level_selected(level_id: int)
 signal prev_level_requested()
 signal next_level_requested()
+signal tower_selected(tower_id: String)
 signal overlay_visibility_changed(is_open: bool)
 
 var _has_started := false
 var _campaign_levels: Array = []
+var _current_available_towers: Array = [] # Array of tower config Dicts
+var _selected_tower_id: String = ""
+var _current_gold: int = 0
 
 # HUD controls
 var _hud_bar: PanelContainer
@@ -25,6 +29,12 @@ var _hud_btn_next: Button
 var _hud_btn_levels: Button
 var _hud_btn_guide: Button
 var _hud_btn_settings: Button
+
+# Bottom Tower Shop
+var _shop_bar: PanelContainer
+var _shop_title_label: Label
+var _shop_cards_box: HBoxContainer
+var _tower_cards: Dictionary = {} # tower_id -> Button
 
 # Overlays
 var _backdrop: ColorRect
@@ -37,7 +47,7 @@ var _lbl_game_title: Label
 var _lbl_subtitle: Label
 var _lbl_settings_title: Label
 var _lbl_lang: Label
-var _lang_buttons: Dictionary = {} # code -> Button
+var _lang_buttons: Dictionary = {}
 var _lbl_master: Label
 var _lbl_sfx: Label
 var _lbl_music: Label
@@ -63,7 +73,7 @@ var _lbl_goal_b: Label
 var _lbl_maze_t: Label
 var _lbl_maze_b: Label
 var _lbl_tiles_t: Label
-var _tile_labels: Dictionary = {} # key -> Label
+var _tile_labels: Dictionary = {}
 var _lbl_ctrl_t: Label
 var _lbl_ctrl_b: Label
 var _btn_guide_back: Button
@@ -78,10 +88,10 @@ var _btn_levels_back: Button
 func _ready() -> void:
 	_load_campaign_index()
 	_build_hud()
+	_build_tower_shop()
 	_build_overlays()
 	SettingsManager.language_changed.connect(_on_language_changed)
 	_apply_translations()
-	# Первичная страница при запуске — страница настроек и выбора языка
 	show_settings()
 
 
@@ -137,7 +147,21 @@ func close_overlays() -> void:
 	play_requested.emit()
 
 
+func set_available_towers(towers: Array, selected_id: String, gold: int) -> void:
+	_current_available_towers = towers
+	_selected_tower_id = selected_id
+	_current_gold = gold
+	_rebuild_tower_shop_cards()
+
+
+func update_shop_state(selected_id: String, gold: int) -> void:
+	_selected_tower_id = selected_id
+	_current_gold = gold
+	_rebuild_tower_shop_cards()
+
+
 func update_hud(level_name: String, gold: int, cores: int, waves: int, msg_key: String) -> void:
+	_current_gold = gold
 	if not _hud_info_label:
 		return
 	_hud_info_label.text = "%s   |   %s: %d   |   %s: %d/10   |   %s: %d" % [
@@ -147,10 +171,12 @@ func update_hud(level_name: String, gold: int, cores: int, waves: int, msg_key: 
 		SettingsManager.tr_key("hud_waves"), waves
 	]
 	_hud_status_label.text = SettingsManager.tr_key(msg_key)
+	_rebuild_tower_shop_cards()
 
 
 func _on_language_changed(_code: String) -> void:
 	_apply_translations()
+	_rebuild_tower_shop_cards()
 
 
 func _make_panel_style(bg: Color, border: Color, radius: int = 10, border_w: int = 2) -> StyleBoxFlat:
@@ -159,21 +185,24 @@ func _make_panel_style(bg: Color, border: Color, radius: int = 10, border_w: int
 	sb.border_color = border
 	sb.set_border_width_all(border_w)
 	sb.set_corner_radius_all(radius)
-	sb.content_margin_left = 18
-	sb.content_margin_right = 18
-	sb.content_margin_top = 14
-	sb.content_margin_bottom = 14
+	sb.content_margin_left = 14
+	sb.content_margin_right = 14
+	sb.content_margin_top = 10
+	sb.content_margin_bottom = 10
 	return sb
 
 
-func _style_button(btn: Button, accent := Color("#00E5FF"), filled := false) -> void:
-	var normal_bg := accent.darkened(0.65) if filled else Color("#111827")
+func _style_button(btn: Button, accent := Color("#00E5FF"), filled := false, dimmed := false) -> void:
+	var border_col := accent.darkened(0.5) if dimmed else accent
+	var normal_bg := accent.darkened(0.62) if filled else Color("#111827")
+	if dimmed:
+		normal_bg = Color("#0D111A")
 	var hover_bg := accent.darkened(0.45) if filled else Color("#1F2937")
 	var pressed_bg := accent.darkened(0.30)
 
-	var sb_n := _make_panel_style(normal_bg, accent, 6, 1)
-	sb_n.content_margin_left = 12
-	sb_n.content_margin_right = 12
+	var sb_n := _make_panel_style(normal_bg, border_col, 6, 2 if filled else 1)
+	sb_n.content_margin_left = 10
+	sb_n.content_margin_right = 10
 	sb_n.content_margin_top = 6
 	sb_n.content_margin_bottom = 6
 
@@ -188,7 +217,7 @@ func _style_button(btn: Button, accent := Color("#00E5FF"), filled := false) -> 
 	btn.add_theme_stylebox_override("hover", sb_h)
 	btn.add_theme_stylebox_override("pressed", sb_p)
 	btn.add_theme_stylebox_override("focus", sb_h)
-	btn.add_theme_color_override("font_color", Color("#F8FAFC"))
+	btn.add_theme_color_override("font_color", Color("#64748B") if dimmed else Color("#F8FAFC"))
 	btn.add_theme_color_override("font_hover_color", Color("#FFFFFF"))
 	btn.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
@@ -208,13 +237,15 @@ func _build_hud() -> void:
 	_hud_bar.add_child(hbox)
 
 	_hud_btn_prev = Button.new()
-	_hud_btn_prev.text = "◀"
+	_hud_btn_prev.text = "<"
+	_hud_btn_prev.custom_minimum_size = Vector2(34, 30)
 	_style_button(_hud_btn_prev)
 	_hud_btn_prev.pressed.connect(func(): prev_level_requested.emit())
 	hbox.add_child(_hud_btn_prev)
 
 	_hud_btn_next = Button.new()
-	_hud_btn_next.text = "▶"
+	_hud_btn_next.text = ">"
+	_hud_btn_next.custom_minimum_size = Vector2(34, 30)
 	_style_button(_hud_btn_next)
 	_hud_btn_next.pressed.connect(func(): next_level_requested.emit())
 	hbox.add_child(_hud_btn_next)
@@ -249,10 +280,78 @@ func _build_hud() -> void:
 	hbox.add_child(_hud_btn_settings)
 
 
+func _build_tower_shop() -> void:
+	_shop_bar = PanelContainer.new()
+	_shop_bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_shop_bar.offset_top = -124.0
+	var shop_style := _make_panel_style(Color("#0D1321"), Color("#1E293B"), 0, 1)
+	shop_style.content_margin_top = 6
+	shop_style.content_margin_bottom = 8
+	_shop_bar.add_theme_stylebox_override("panel", shop_style)
+	add_child(_shop_bar)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	_shop_bar.add_child(vbox)
+
+	_shop_title_label = Label.new()
+	_shop_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_shop_title_label.add_theme_font_size_override("font_size", 12)
+	_shop_title_label.add_theme_color_override("font_color", Color("#94A3B8"))
+	vbox.add_child(_shop_title_label)
+
+	_shop_cards_box = HBoxContainer.new()
+	_shop_cards_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	_shop_cards_box.add_theme_constant_override("separation", 10)
+	vbox.add_child(_shop_cards_box)
+
+
+func _rebuild_tower_shop_cards() -> void:
+	if not _shop_cards_box:
+		return
+	for child in _shop_cards_box.get_children():
+		child.queue_free()
+	_tower_cards.clear()
+
+	var t := SettingsManager.tr_key
+	var dmg_l := t.call("stat_dmg")
+	var rng_l := t.call("stat_rng")
+	var rof_l := t.call("stat_rof")
+	var cost_l := t.call("stat_cost")
+
+	for i in _current_available_towers.size():
+		var cfg: Dictionary = _current_available_towers[i]
+		var tid := str(cfg.get("id", "pulse"))
+		var tname := str(cfg.get("name", tid))
+		var cost := int(cfg.get("cost", 25))
+		var dmg := int(cfg.get("damage", 10))
+		var rng := int(cfg.get("range", 180))
+		var rof := float(cfg.get("fire_rate", 1.0))
+		var col := Color(str(cfg.get("color", "#00E5FF")))
+		var role := t.call("role_" + tid)
+
+		var can_afford := _current_gold >= cost
+		var is_sel := (tid == _selected_tower_id)
+
+		var btn := Button.new()
+		btn.custom_minimum_size = Vector2(220, 84)
+		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		btn.add_theme_font_size_override("font_size", 12)
+		btn.text = "[%d] %s  —  %d %s\n%s: %d  |  %s: %d  |  %s: %.1f/s\n%s" % [
+			i + 1, tname, cost, cost_l,
+			dmg_l, dmg, rng_l, rng, rof_l, rof,
+			role
+		]
+		_style_button(btn, col, is_sel, not can_afford)
+		btn.pressed.connect(func(): tower_selected.emit(tid))
+		_shop_cards_box.add_child(btn)
+		_tower_cards[tid] = btn
+
+
 func _build_overlays() -> void:
 	_backdrop = ColorRect.new()
 	_backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_backdrop.color = Color(0.03, 0.05, 0.09, 0.88)
+	_backdrop.color = Color(0.03, 0.05, 0.09, 0.90)
 	_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_backdrop)
 
@@ -294,7 +393,6 @@ func _build_settings_panel(parent: Control) -> void:
 	_lbl_settings_title.add_theme_color_override("font_color", Color("#F8FAFC"))
 	vbox.add_child(_lbl_settings_title)
 
-	# Language selector (7 buttons)
 	_lbl_lang = Label.new()
 	_lbl_lang.add_theme_color_override("font_color", Color("#CBD5E1"))
 	vbox.add_child(_lbl_lang)
@@ -316,7 +414,6 @@ func _build_settings_panel(parent: Control) -> void:
 
 	vbox.add_child(HSeparator.new())
 
-	# Volume sliders
 	var master_row := _make_slider_row(vbox)
 	_lbl_master = master_row[0]
 	_slider_master = master_row[1]
@@ -344,7 +441,6 @@ func _build_settings_panel(parent: Control) -> void:
 		_val_music.text = "%d%%" % int(v)
 	)
 
-	# Checkboxes row
 	var toggles := HBoxContainer.new()
 	toggles.add_theme_constant_override("separation", 20)
 	vbox.add_child(toggles)
@@ -361,7 +457,6 @@ func _build_settings_panel(parent: Control) -> void:
 	_chk_grid.toggled.connect(func(on: bool): SettingsManager.set_show_grid_lines(on))
 	toggles.add_child(_chk_grid)
 
-	# Default game speed row
 	var speed_row := HBoxContainer.new()
 	speed_row.add_theme_constant_override("separation", 10)
 	vbox.add_child(speed_row)
@@ -386,7 +481,6 @@ func _build_settings_panel(parent: Control) -> void:
 	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(sp)
 
-	# Bottom action buttons
 	var actions := HBoxContainer.new()
 	actions.add_theme_constant_override("separation", 12)
 	actions.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -473,8 +567,8 @@ func _build_guide_panel(parent: Control) -> void:
 	var legend_items := [
 		["tile_spawn", Color("#F97316")],
 		["tile_core", Color("#00E5FF")],
+		["tile_path", Color("#111F33")],
 		["tile_wall", Color("#334155")],
-		["tile_no_build", Color("#F59E0B")],
 		["tile_boost", Color("#10B981")],
 		["tile_tower", Color("#3B82F6")]
 	]
@@ -630,7 +724,8 @@ func _apply_translations() -> void:
 
 	_hud_btn_levels.text = t.call("btn_levels")
 	_hud_btn_guide.text = "? " + t.call("btn_how_to_play")
-	_hud_btn_settings.text = "⚙ " + t.call("btn_settings")
+	_hud_btn_settings.text = t.call("btn_settings")
+	_shop_title_label.text = t.call("shop_title")
 
 	_lbl_guide_title.text = t.call("guide_title")
 	_lbl_goal_t.text = t.call("guide_goal_title")

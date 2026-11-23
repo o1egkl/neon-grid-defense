@@ -2,143 +2,157 @@
   "levels": [
     {
       "id": 1,
-      "name": "01. Open Grid",
-      "theme": "Training Field",
+      "name": "01. Neon Bend",
+      "theme": "Training Route",
       "file": "res://data/levels/level_01.json",
       "waves": 10,
       "spawns": 1,
+      "towers_count": 2,
       "has_air": false,
-      "base_path_len": 23
+      "path_len": 37
     },
     {
       "id": 2,
-      "name": "02. Monolith",
-      "theme": "Central Obstacle",
+      "name": "02. Twin Loops",
+      "theme": "Double S-Curve",
       "file": "res://data/levels/level_02.json",
       "waves": 11,
       "spawns": 1,
+      "towers_count": 3,
       "has_air": false,
-      "base_path_len": 29
+      "path_len": 51
     },
     {
       "id": 3,
-      "name": "03. Twin Gates",
-      "theme": "Chokepoints",
+      "name": "03. Iron Corridor",
+      "theme": "Armored Push",
       "file": "res://data/levels/level_03.json",
       "waves": 12,
       "spawns": 1,
+      "towers_count": 4,
       "has_air": false,
-      "base_path_len": 27
+      "path_len": 63
     },
     {
       "id": 4,
-      "name": "04. Neon Canyon",
-      "theme": "Zig-Zag Corridor",
+      "name": "04. Serpent Ridge",
+      "theme": "Long Snake",
       "file": "res://data/levels/level_04.json",
       "waves": 12,
       "spawns": 1,
+      "towers_count": 4,
       "has_air": false,
-      "base_path_len": 46
+      "path_len": 67
     },
     {
       "id": 5,
-      "name": "05. Quad Pillars",
-      "theme": "Symmetrical Islands",
+      "name": "05. Laser Trench",
+      "theme": "Thermal Focus",
       "file": "res://data/levels/level_05.json",
       "waves": 13,
       "spawns": 1,
+      "towers_count": 5,
       "has_air": false,
-      "base_path_len": 23
+      "path_len": 58
     },
     {
       "id": 6,
       "name": "06. Split Front",
-      "theme": "Dual Spawn",
+      "theme": "Dual Spawn + Shields",
       "file": "res://data/levels/level_06.json",
       "waves": 14,
       "spawns": 2,
+      "towers_count": 6,
       "has_air": false,
-      "base_path_len": 28
+      "path_len": 35
     },
     {
       "id": 7,
-      "name": "07. Data Highway",
-      "theme": "No-Build Zone",
+      "name": "07. Data Loop",
+      "theme": "Central Ring",
       "file": "res://data/levels/level_07.json",
       "waves": 14,
       "spawns": 1,
+      "towers_count": 6,
       "has_air": false,
-      "base_path_len": 25
+      "path_len": 66
     },
     {
       "id": 8,
       "name": "08. Core Bunker",
-      "theme": "Fortified Center",
+      "theme": "Center Defense",
       "file": "res://data/levels/level_08.json",
       "waves": 15,
       "spawns": 2,
+      "towers_count": 6,
       "has_air": false,
-      "base_path_len": 16
+      "path_len": 37
     },
     {
       "id": 9,
       "name": "09. Sky Bridges",
-      "theme": "Three Bridges",
+      "theme": "Medic Waves",
       "file": "res://data/levels/level_09.json",
       "waves": 15,
-      "spawns": 1,
+      "spawns": 2,
+      "towers_count": 6,
       "has_air": false,
-      "base_path_len": 23
+      "path_len": 34
     },
     {
       "id": 10,
       "name": "10. Sector Zero",
-      "theme": "Ruined Grid (Mid-Boss)",
+      "theme": "Mid-Campaign Boss",
       "file": "res://data/levels/level_10.json",
       "waves": 16,
       "spawns": 2,
+      "towers_count": 6,
       "has_air": false,
-      "base_path_len": 28
+      "path_len": 41
     },
     {
       "id": 11,
       "name": "11. Helix Conduit",
-      "theme": "Spiral Corridor",
+      "theme": "Inward Spiral",
       "file": "res://data/levels/level_11.json",
       "waves": 16,
       "spawns": 1,
+      "towers_count": 6,
       "has_air": false,
-      "base_path_len": 18
+      "path_len": 101
     },
     {
       "id": 12,
       "name": "12. Quantum Matrix",
-      "theme": "Checkerboard Pillars",
+      "theme": "Splitter Debut",
       "file": "res://data/levels/level_12.json",
       "waves": 17,
       "spawns": 1,
+      "towers_count": 6,
       "has_air": false,
-      "base_path_len": 23
+      "path_len": 54
     },
     {
       "id": 13,
       "name": "13. Crossfire",
-      "theme": "Top & Bottom Spawns",
+      "theme": "North & South Assault",
       "file": "res://data/levels/level_13.json",
       "waves": 17,
       "spawns": 2,
+      "towers_count": 6,
       "has_air": false,
-      "base_path_len": 23
+      "path_len": 33
     },
     {
       "id": 14,
       "name": "14. Archipelago",
-      "theme": "Connected Islands",
+      "theme": "Tactical Chokepoints",
       "file": "res://data/levels/level_14.json",
       "waves": 18,
       "spawns": 2,
+      "towers_count": 6,
       "has_air": false,
-      "base_path_len": 28
+      "path_len": 34
     },
     {
       "id": 15,
@@ -147,58 +161,64 @@
       "file": "res://data/levels/level_15.json",
       "waves": 18,
       "spawns": 1,
+      "towers_count": 6,
       "has_air": true,
-      "base_path_len": 23
+      "path_len": 45
     },
     {
       "id": 16,
       "name": "16. Relay Station",
-      "theme": "Restricted Grid + Air",
+      "theme": "Dual Lanes + Air",
       "file": "res://data/levels/level_16.json",
       "waves": 19,
       "spawns": 2,
+      "towers_count": 6,
       "has_air": true,
-      "base_path_len": 29
+      "path_len": 35
     },
     {
       "id": 17,
       "name": "17. Tri-Vector",
-      "theme": "Triple Spawn",
+      "theme": "Triple Front",
       "file": "res://data/levels/level_17.json",
       "waves": 20,
       "spawns": 3,
+      "towers_count": 6,
       "has_air": true,
-      "base_path_len": 29
+      "path_len": 29
     },
     {
       "id": 18,
       "name": "18. The Gauntlet",
-      "theme": "Long Corridor Maze",
+      "theme": "Marathon Corridor",
       "file": "res://data/levels/level_18.json",
       "waves": 21,
       "spawns": 1,
+      "towers_count": 6,
       "has_air": true,
-      "base_path_len": 70
+      "path_len": 79
     },
     {
       "id": 19,
       "name": "19. Citadel Ring",
-      "theme": "360° Defense",
+      "theme": "360° Siege",
       "file": "res://data/levels/level_19.json",
       "waves": 22,
       "spawns": 4,
+      "towers_count": 6,
       "has_air": true,
-      "base_path_len": 17
+      "path_len": 19
     },
     {
       "id": 20,
       "name": "20. Neon Singularity",
-      "theme": "Final Campaign Level",
+      "theme": "Final Campaign",
       "file": "res://data/levels/level_20.json",
       "waves": 25,
       "spawns": 3,
+      "towers_count": 6,
       "has_air": true,
-      "base_path_len": 17
+      "path_len": 34
     }
   ]
 }
