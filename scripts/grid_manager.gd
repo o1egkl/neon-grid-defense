@@ -82,6 +82,17 @@ var _ended: bool = false
 var _round_robin_spawn: int = 0
 var _anim_time: float = 0.0
 
+# Camera Zoom & Pan (Desktop Wheel + MMB/WASD + Android 2-Finger Pinch)
+var _base_cam_size: float = 22.8
+var _zoom_factor: float = 1.0
+var _target_zoom: float = 1.0
+var _pan_offset := Vector3.ZERO
+var _mmb_dragging: bool = false
+var _touches: Dictionary = {} # finger_idx -> Vector2
+var _prev_pinch_dist: float = 0.0
+var _prev_pinch_center := Vector2.ZERO
+var _pinch_lock_timer: float = 0.0
+
 
 func _ready() -> void:
 	_load_enemy_catalog()
@@ -188,16 +199,34 @@ func _setup_containers() -> void:
 func _update_camera_fit() -> void:
 	if not _camera:
 		return
-	var center := Vector3(float(grid_size.x) * 0.5, 0.0, float(grid_size.y) * 0.5)
-	var offset := Vector3(0.0, 26.0, 21.0).rotated(Vector3.UP, deg_to_rad(30.0))
-	_camera.look_at_from_position(center + offset, center + Vector3(0.0, -0.3, 0.6), Vector3.UP)
-
 	var vp: Vector2 = get_viewport().get_visible_rect().size
 	var aspect: float = maxf(vp.x / maxf(vp.y, 1.0), 0.5)
-	var base_size: float = 22.8
+	_base_cam_size = 22.8
 	if aspect < 1.65:
-		base_size = 22.8 * (1.65 / aspect)
-	_camera.size = base_size
+		_base_cam_size = 22.8 * (1.65 / aspect)
+	_apply_camera_transform()
+
+
+func _apply_camera_transform() -> void:
+	if not _camera:
+		return
+	var max_px: float = float(grid_size.x) * 0.42
+	var max_pz: float = float(grid_size.y) * 0.45
+	_pan_offset.x = clampf(_pan_offset.x, -max_px, max_px)
+	_pan_offset.z = clampf(_pan_offset.z, -max_pz, max_pz)
+	var center := Vector3(float(grid_size.x) * 0.5, 0.0, float(grid_size.y) * 0.5) + _pan_offset
+	var offset := Vector3(0.0, 26.0, 21.0).rotated(Vector3.UP, deg_to_rad(30.0))
+	_camera.look_at_from_position(center + offset, center + Vector3(0.0, -0.3, 0.6), Vector3.UP)
+	_camera.size = _base_cam_size * _zoom_factor
+
+
+func zoom_by(multiplier: float) -> void:
+	_target_zoom = clampf(_target_zoom * multiplier, 0.36, 1.15)
+
+
+func reset_camera() -> void:
+	_target_zoom = 1.0
+	_pan_offset = Vector3.ZERO
 
 
 func _on_settings_changed() -> void:
@@ -414,6 +443,9 @@ func load_level_from_file(path: String) -> bool:
 	_wave_active = false
 	_ended = false
 	_core_flash = 0.0
+	_zoom_factor = 1.0
+	_target_zoom = 1.0
+	_pan_offset = Vector3.ZERO
 
 	_init_grid_state()
 	_build_3d_board()
@@ -514,6 +546,16 @@ func _build_3d_board() -> void:
 	base_plate.position = Vector3(float(grid_size.x) * 0.5, -0.34, float(grid_size.y) * 0.5)
 	base_plate.material_override = _make_mat(Color("#070C15"), 0.0, 1.0, 0.65, 0.45)
 	_board_root.add_child(base_plate)
+
+	# Неоновая рамка по периметру всей 3D-доски (как на концепте)
+	var gx: float = float(grid_size.x)
+	var gz: float = float(grid_size.y)
+	var rim_cyan := _make_mat(Color("#00E5FF"), 2.4, 0.9, 0.1, 0.2)
+	var rim_viol := _make_mat(Color("#A855F7"), 2.2, 0.9, 0.1, 0.2)
+	_board_root.add_child(_create_beam_mesh(Vector3(-0.25, -0.02, -0.25), Vector3(gx + 0.25, -0.02, -0.25), 0.09, rim_cyan))
+	_board_root.add_child(_create_beam_mesh(Vector3(-0.25, -0.02, gz + 0.25), Vector3(gx + 0.25, -0.02, gz + 0.25), 0.09, rim_viol))
+	_board_root.add_child(_create_beam_mesh(Vector3(-0.25, -0.02, -0.25), Vector3(-0.25, -0.02, gz + 0.25), 0.09, rim_cyan))
+	_board_root.add_child(_create_beam_mesh(Vector3(gx + 0.25, -0.02, -0.25), Vector3(gx + 0.25, -0.02, gz + 0.25), 0.09, rim_viol))
 
 	var tile_mesh := BoxMesh.new()
 	tile_mesh.size = Vector3(0.90, 0.16, 0.90)
@@ -665,7 +707,7 @@ func _build_3d_routes() -> void:
 			var b: Vector3 = pts[i + 1] + Vector3(0.0, -0.02, 0.0)
 			if a.distance_to(b) < 0.01:
 				continue
-			var seg := _create_beam_mesh(a, b, 0.095, line_mat)
+			var seg := _create_beam_mesh(a, b, 0.15, line_mat)
 			_route_root.add_child(seg)
 			var cap := MeshInstance3D.new()
 			cap.mesh = joint_mesh
@@ -707,8 +749,48 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not input_enabled:
 		return
 
+	# Android / Touch: 2-finger Pinch-to-Zoom & Pan
+	if event is InputEventScreenTouch:
+		var st: InputEventScreenTouch = event
+		if st.pressed:
+			_touches[st.index] = st.position
+			if _touches.size() == 2:
+				var ks: Array = _touches.keys()
+				var p0: Vector2 = _touches[ks[0]]
+				var p1: Vector2 = _touches[ks[1]]
+				_prev_pinch_dist = maxf(p0.distance_to(p1), 1.0)
+				_prev_pinch_center = (p0 + p1) * 0.5
+				_pinch_lock_timer = 0.30
+		else:
+			_touches.erase(st.index)
+			if _touches.size() < 2:
+				_prev_pinch_dist = 0.0
+		return
+
+	if event is InputEventScreenDrag:
+		var sd: InputEventScreenDrag = event
+		_touches[sd.index] = sd.position
+		if _touches.size() == 2:
+			_pinch_lock_timer = 0.30
+			var ks: Array = _touches.keys()
+			var p0: Vector2 = _touches[ks[0]]
+			var p1: Vector2 = _touches[ks[1]]
+			var dist: float = maxf(p0.distance_to(p1), 1.0)
+			if _prev_pinch_dist > 1.0:
+				var ratio: float = _prev_pinch_dist / dist
+				_target_zoom = clampf(_target_zoom * ratio, 0.36, 1.15)
+			var center_now: Vector2 = (p0 + p1) * 0.5
+			var delta_c: Vector2 = center_now - _prev_pinch_center
+			_pan_screen_delta(delta_c)
+			_prev_pinch_dist = dist
+			_prev_pinch_center = center_now
+		return
+
 	if event is InputEventMouseMotion:
 		var me: InputEventMouseMotion = event
+		if _mmb_dragging:
+			_pan_screen_delta(me.relative)
+			return
 		var cell: Vector2i = _raycast_mouse_to_cell(me.position)
 		if cell != _hover_cell:
 			_hover_cell = cell
@@ -717,7 +799,18 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	elif event is InputEventMouseButton:
 		var mb: InputEventMouseButton = event
+		if mb.button_index == MOUSE_BUTTON_MIDDLE:
+			_mmb_dragging = mb.pressed
+			return
 		if not mb.pressed:
+			return
+		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+			zoom_by(0.88)
+			return
+		if mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			zoom_by(1.14)
+			return
+		if _pinch_lock_timer > 0.0:
 			return
 		var cell: Vector2i = _raycast_mouse_to_cell(mb.position)
 		if not _cells.has(cell):
@@ -727,6 +820,22 @@ func _unhandled_input(event: InputEvent) -> void:
 			_handle_left_click(cell)
 		elif mb.button_index == MOUSE_BUTTON_RIGHT:
 			_handle_right_click(cell)
+
+
+func _pan_screen_delta(delta_px: Vector2) -> void:
+	if not _camera:
+		return
+	var vp_h: float = maxf(get_viewport().get_visible_rect().size.y, 1.0)
+	var world_per_px: float = _camera.size / vp_h
+	var cam_right: Vector3 = _camera.global_transform.basis.x
+	var cam_fwd: Vector3 = -_camera.global_transform.basis.z
+	cam_right.y = 0.0
+	cam_fwd.y = 0.0
+	cam_right = cam_right.normalized()
+	cam_fwd = cam_fwd.normalized()
+	_pan_offset -= cam_right * (delta_px.x * world_per_px)
+	_pan_offset += cam_fwd * (delta_px.y * world_per_px)
+	_apply_camera_transform()
 
 
 func _update_hover_visuals() -> void:
@@ -1137,6 +1246,27 @@ func start_next_wave() -> bool:
 
 func _process(delta: float) -> void:
 	_anim_time += delta
+	if _pinch_lock_timer > 0.0:
+		_pinch_lock_timer = maxf(0.0, _pinch_lock_timer - delta)
+	var cam_dirty: bool = false
+	if absf(_zoom_factor - _target_zoom) > 0.001:
+		_zoom_factor = lerpf(_zoom_factor, _target_zoom, minf(1.0, delta * 12.0))
+		cam_dirty = true
+	if input_enabled:
+		var pan_v := Vector2.ZERO
+		if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):
+			pan_v.x += 1.0
+		if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT):
+			pan_v.x -= 1.0
+		if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):
+			pan_v.y += 1.0
+		if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):
+			pan_v.y -= 1.0
+		if pan_v.length_squared() > 0.01:
+			_pan_screen_delta(pan_v.normalized() * 480.0 * delta)
+			cam_dirty = false
+	if cam_dirty:
+		_apply_camera_transform()
 	if is_instance_valid(_core_sphere):
 		_core_sphere.position.y = 0.62 + sin(_anim_time * 2.6) * 0.08
 	if is_instance_valid(_core_ring_a):

@@ -11,6 +11,8 @@ extends CanvasLayer
 signal play_requested()
 signal start_wave_requested()
 signal speed_cycle_requested()
+signal zoom_in_requested()
+signal zoom_out_requested()
 signal level_selected(level_id: int)
 signal prev_level_requested()
 signal next_level_requested()
@@ -32,7 +34,16 @@ var _last_result_is_victory: bool = true
 
 # HUD
 var _hud_bar: PanelContainer
-var _hud_info_label: Label
+var _pill_level: PanelContainer
+var _lbl_level: Label
+var _pill_credits: PanelContainer
+var _lbl_credits: Label
+var _pill_cores: PanelContainer
+var _lbl_cores: Label
+var _pill_wave: PanelContainer
+var _lbl_wave: Label
+var _hud_btn_zoom_out: Button
+var _hud_btn_zoom_in: Button
 var _hud_status_label: Label
 var _hud_btn_prev: Button
 var _hud_btn_next: Button
@@ -222,16 +233,45 @@ func update_shop_state(selected_id: String, gold: int) -> void:
 
 func update_hud(level_name: String, gold: int, cores: int, cur_wave: int, total_waves: int, msg_key: String) -> void:
 	_current_gold = gold
-	if not _hud_info_label:
+	if not _lbl_level:
 		return
-	_hud_info_label.text = "%s  |  %s: %d  |  %s: %d/10  |  %s: %d/%d" % [
-		level_name,
-		SettingsManager.tr_key("hud_credits"), gold,
-		SettingsManager.tr_key("hud_cores"), cores,
-		SettingsManager.tr_key("hud_waves"), cur_wave, total_waves
-	]
+	_lbl_level.text = level_name.to_upper()
+	_lbl_credits.text = "%s: %d" % [SettingsManager.tr_key("hud_credits").to_upper(), gold]
+	_lbl_cores.text = "%s: %d/10" % [SettingsManager.tr_key("hud_cores").to_upper(), cores]
+	_lbl_wave.text = "%s: %d/%d" % [SettingsManager.tr_key("hud_waves").to_upper(), cur_wave, total_waves]
+
+	# Красная тревога на бейдже Ядер, если осталось <= 3
+	var core_accent := Color("#EF4444") if cores <= 3 else Color("#38BDF8")
+	var core_bg := Color("#2D0A12") if cores <= 3 else Color("#082032")
+	_pill_cores.add_theme_stylebox_override("panel", _make_pill_style(core_bg, core_accent))
+	_lbl_cores.add_theme_color_override("font_color", Color("#FCA5A5") if cores <= 3 else Color("#7DD3FC"))
+
 	_hud_status_label.text = SettingsManager.tr_key(msg_key)
 	_rebuild_tower_shop_cards()
+
+
+func _make_pill_style(bg: Color, border: Color) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.border_color = border
+	sb.set_border_width_all(2)
+	sb.set_corner_radius_all(14)
+	sb.content_margin_left = 12
+	sb.content_margin_right = 12
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	return sb
+
+
+func _make_hud_pill(parent: Control, bg: Color, border: Color, text_col: Color) -> Array:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", _make_pill_style(bg, border))
+	parent.add_child(p)
+	var l := Label.new()
+	l.add_theme_font_size_override("font_size", 13)
+	l.add_theme_color_override("font_color", text_col)
+	p.add_child(l)
+	return [p, l]
 
 
 func _on_language_changed(_code: String) -> void:
@@ -311,10 +351,21 @@ func _build_hud() -> void:
 	_hud_btn_next.pressed.connect(func(): next_level_requested.emit())
 	hbox.add_child(_hud_btn_next)
 
-	_hud_info_label = Label.new()
-	_hud_info_label.add_theme_color_override("font_color", Color("#00E5FF"))
-	_hud_info_label.add_theme_font_size_override("font_size", 14)
-	hbox.add_child(_hud_info_label)
+	var p_lvl: Array = _make_hud_pill(hbox, Color("#071E2E"), Color("#00E5FF"), Color("#E0F7FA"))
+	_pill_level = p_lvl[0]
+	_lbl_level = p_lvl[1]
+
+	var p_cr: Array = _make_hud_pill(hbox, Color("#261D06"), Color("#FACC15"), Color("#FEF08A"))
+	_pill_credits = p_cr[0]
+	_lbl_credits = p_cr[1]
+
+	var p_co: Array = _make_hud_pill(hbox, Color("#082032"), Color("#38BDF8"), Color("#7DD3FC"))
+	_pill_cores = p_co[0]
+	_lbl_cores = p_co[1]
+
+	var p_wv: Array = _make_hud_pill(hbox, Color("#291306"), Color("#F97316"), Color("#FDBA74"))
+	_pill_wave = p_wv[0]
+	_lbl_wave = p_wv[1]
 
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -337,6 +388,20 @@ func _build_hud() -> void:
 	_style_button(_hud_btn_speed, Color("#F59E0B"))
 	_hud_btn_speed.pressed.connect(func(): speed_cycle_requested.emit())
 	hbox.add_child(_hud_btn_speed)
+
+	_hud_btn_zoom_out = Button.new()
+	_hud_btn_zoom_out.text = "-"
+	_hud_btn_zoom_out.custom_minimum_size = Vector2(30, 32)
+	_style_button(_hud_btn_zoom_out, Color("#00E5FF"))
+	_hud_btn_zoom_out.pressed.connect(func(): zoom_out_requested.emit())
+	hbox.add_child(_hud_btn_zoom_out)
+
+	_hud_btn_zoom_in = Button.new()
+	_hud_btn_zoom_in.text = "+"
+	_hud_btn_zoom_in.custom_minimum_size = Vector2(30, 32)
+	_style_button(_hud_btn_zoom_in, Color("#00E5FF"))
+	_hud_btn_zoom_in.pressed.connect(func(): zoom_in_requested.emit())
+	hbox.add_child(_hud_btn_zoom_in)
 
 	_hud_btn_levels = Button.new()
 	_style_button(_hud_btn_levels, Color("#3B82F6"))

@@ -47,6 +47,8 @@ func _ready() -> void:
 	ui.retry_level_requested.connect(func(): _load_level(current_level_index))
 	ui.start_wave_requested.connect(_on_start_wave)
 	ui.speed_cycle_requested.connect(_on_cycle_speed)
+	ui.zoom_in_requested.connect(func(): grid_manager.zoom_by(0.84))
+	ui.zoom_out_requested.connect(func(): grid_manager.zoom_by(1.18))
 	ui.tower_selected.connect(_select_tower)
 	ui.upgrade_inspected_requested.connect(_on_upgrade_inspected)
 	ui.sell_inspected_requested.connect(_on_sell_inspected)
@@ -85,6 +87,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if ui.is_any_overlay_open():
 		return
 
+	if ke.keycode == KEY_0:
+		grid_manager.reset_camera()
+		return
 	if ke.keycode == KEY_SPACE:
 		_on_start_wave()
 		return
