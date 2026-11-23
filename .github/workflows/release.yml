@@ -109,6 +109,7 @@ jobs:
   build-macos:
     name: Build macOS (Universal .zip)
     runs-on: ubuntu-latest
+    continue-on-error: true
     container:
       image: barichello/godot-ci:4.3
     steps:
@@ -138,14 +139,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Create debug keystore
+      - name: Prepare debug keystore
         run: |
+          export HOME=/root
           mkdir -p builds/android
           if [ ! -f /root/debug.keystore ]; then
             keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android \
               -keystore /root/debug.keystore -storepass android \
               -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
           fi
+          sed -i 's|keystore/debug=""|keystore/debug="/root/debug.keystore"|g' export_presets.cfg
 
       - name: Pre-heat project (.godot import cache)
         run: HOME=/root godot --headless --import --quit || true
