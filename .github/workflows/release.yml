@@ -181,6 +181,7 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          fail_on_unmatched_files: false
           files: |
             release-artifacts/neon-grid-defense-web.zip
             release-artifacts/neon-grid-defense-windows/NeonGridDefense.exe
