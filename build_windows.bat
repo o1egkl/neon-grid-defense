@@ -23,7 +23,7 @@ if errorlevel 1 (
 if not exist "builds\windows" mkdir "builds\windows"
 
 echo [Neon Grid Defense] Exporting Windows Desktop build...
-"%GODOT_CMD%" --headless --path "%~dp0" --export-release "Windows Desktop" "builds\windows\NeonGridDefense.exe"
+"%GODOT_CMD%" --headless --path . --export-release "Windows Desktop" "builds\windows\NeonGridDefense.exe"
 if errorlevel 1 (
     echo [ERROR] Export failed. Make sure Godot 4.3 Export Templates are installed.
     pause

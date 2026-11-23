@@ -25,5 +25,5 @@ if errorlevel 1 (
 )
 
 echo [Neon Grid Defense] Launching game...
-"%GODOT_CMD%" --path "%~dp0"
+"%GODOT_CMD%" --path .
 endlocal
