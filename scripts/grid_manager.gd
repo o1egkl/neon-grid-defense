@@ -1467,15 +1467,18 @@ func start_next_wave() -> bool:
 
 	_current_wave_idx += 1
 	var w_data: Dictionary = _waves_data[_current_wave_idx]
-	var hp_mult: float = float(w_data.get("hp_multiplier", 1.0))
+	var diff_mods: Dictionary = SettingsManager.get_difficulty_mods()
+	var wave_scale: float = minf(1.80, 1.0 + float(_current_wave_idx) * 0.08)
+	var hp_mult: float = float(w_data.get("hp_multiplier", 1.0)) * wave_scale
+	var int_mult: float = float(diff_mods.get("spawn_int_mult", 1.0))
 	_spawn_queue.clear()
 	_wave_time = 0.0
 
 	for grp in w_data.get("groups", []):
 		var eid: String = str(grp.get("enemy", "trooper"))
 		var cnt: int = int(grp.get("count", 5))
-		var interval: float = float(grp.get("interval", 0.8))
-		var delay: float = float(grp.get("delay", 0.0))
+		var interval: float = maxf(0.18, float(grp.get("interval", 0.8)) * int_mult)
+		var delay: float = float(grp.get("delay", 0.0)) * int_mult
 		var elite: bool = bool(grp.get("elite", false))
 		for i in cnt:
 			var pidx: int = _round_robin_spawn % max(smooth_paths.size(), 1)
@@ -2251,9 +2254,10 @@ func _damage_enemy_at(idx: int, raw_dmg: float, dmg_type: String, is_crit: bool)
 			e["shield"] = 0.0
 
 	var armor: float = float(e["armor"])
-	if dmg_type == "pierce" or dmg_type == "thermal":
-		armor = 0.0
-	var final_dmg: float = maxf(1.0, remaining - armor * 0.6)
+	var final_dmg: float = remaining
+	if armor > 0.0 and dmg_type != "pierce" and dmg_type != "thermal":
+		var reduction: float = minf(0.45, armor * 0.0375)
+		final_dmg = maxf(1.0, remaining * (1.0 - reduction))
 	e["hp"] = float(e["hp"]) - final_dmg
 	_spawn_damage_label(e["pos"], int(roundf(final_dmg)), Color("#FCA5A5"), is_crit)
 

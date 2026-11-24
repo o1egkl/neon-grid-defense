@@ -161,11 +161,11 @@ func set_difficulty(diff_id: String) -> void:
 func get_difficulty_mods() -> Dictionary:
 	match difficulty:
 		"hard":
-			return {"id": "hard", "hp_mult": 1.25, "speed_mult": 1.05, "gold_mult": 1.00, "bounty_mult": 1.00, "cores": 10, "color": "#F59E0B"}
+			return {"id": "hard", "hp_mult": 1.85, "speed_mult": 1.12, "spawn_int_mult": 0.85, "gold_mult": 0.80, "bounty_mult": 0.85, "interest_rate": 0.02, "cores": 10, "color": "#F59E0B"}
 		"nightmare":
-			return {"id": "nightmare", "hp_mult": 1.75, "speed_mult": 1.18, "gold_mult": 0.85, "bounty_mult": 0.90, "cores": 5, "color": "#EF4444"}
+			return {"id": "nightmare", "hp_mult": 2.75, "speed_mult": 1.25, "spawn_int_mult": 0.72, "gold_mult": 0.70, "bounty_mult": 0.75, "interest_rate": 0.00, "cores": 5, "color": "#EF4444"}
 		_:
-			return {"id": "easy", "hp_mult": 0.75, "speed_mult": 0.90, "gold_mult": 1.30, "bounty_mult": 1.15, "cores": 15, "color": "#10B981"}
+			return {"id": "easy", "hp_mult": 0.95, "speed_mult": 0.95, "spawn_int_mult": 1.00, "gold_mult": 1.00, "bounty_mult": 1.00, "interest_rate": 0.05, "cores": 15, "color": "#10B981"}
 
 
 func _apply_audio() -> void:

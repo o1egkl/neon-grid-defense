@@ -3,7 +3,7 @@
     {
       "id": "pulse",
       "name": "Pulse Turret",
-      "cost": 25,
+      "cost": 35,
       "range": 180,
       "fire_rate": 2.5,
       "damage": 12,

@@ -264,8 +264,10 @@ func _on_difficulty_changed(_diff_id: String) -> void:
 
 
 func _on_wave_cleared(bonus_gold: int) -> void:
-	var b_mult: float = float(SettingsManager.get_difficulty_mods().get("bounty_mult", 1.0))
-	var interest: int = int(floorf(float(gold) * 0.05))
+	var dmods: Dictionary = SettingsManager.get_difficulty_mods()
+	var b_mult: float = float(dmods.get("bounty_mult", 1.0))
+	var i_rate: float = float(dmods.get("interest_rate", 0.05))
+	var interest: int = int(floorf(float(gold) * i_rate))
 	gold += int(roundf(float(bonus_gold) * b_mult)) + interest
 	last_msg_key = "msg_wave_cleared"
 	_refresh_hud()
