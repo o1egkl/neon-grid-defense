@@ -1,28 +1,53 @@
 # Neon Grid Defense
 
-Тактическая игра Tower Defense с механикой **mazing** (построения лабиринта на открытой сетке) на базе **Godot 4.3+**.
+[English](README.md) | [Español](README.es.md) | [Русский](README.ru.md) | [Português](README.pt.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Italiano](README.it.md)
 
-## Структура проекта
-* `scenes/main.tscn` — основная игровая сцена с сеткой и базовым HUD.
-* `scripts/pathfinding_service.gd` — обёртка над `AStarGrid2D` с проверкой блокировки пути и предпросмотром маршрута.
-* `scripts/grid_manager.gd` — управление сеткой, загрузка уровней из JSON, отрисовка стен, зон запрета строительства (`no_build_zones`), площадок усиления (`boost_tiles`) и линий маршрута для нескольких спавнов.
-* `scripts/main.gd` — переключение уровней (`[` / `]` или `PageUp` / `PageDown`) и обновление HUD.
-* `data/towers.json`, `data/enemies.json` — конфигурации 6 башен и 7 архетипов врагов.
-* `data/levels/level_01.json` .. `level_20.json` + `campaign.json` — 20 уровней кампании с прогрессией волн, боссами, воздушными рейдами и валидированными маршрутами.
-* `play_windows.bat` — подтягивает свежий код (`git pull`) и сразу запускает игру на Windows.
-* `build_windows.bat` — подтягивает свежий код (`git pull`), пересобирает автономный `builds\windows\NeonGridDefense.exe` и запускает его.
-* `docs/TZ_Grid_Defense_TD.md` — техническое задание и дизайн-документ.
-* `.github/workflows/release.yml` — CI/CD для автосборки Web, Windows, Linux, macOS и Android.
+**Neon Grid Defense** is a 3D tactical fixed-path Tower Defense game built with **Godot 4.3+ (`GL Compatibility`)**, featuring a frontal 58° tactical camera, procedural PBR textures, 20 campaign levels, and 7 in-game languages.
 
-## Быстрый старт на GitHub (PowerShell)
-```powershell
-Expand-Archive -Path "D:\downloads\neon-grid-defense-repo-all-platforms.zip" -DestinationPath ".\neon-grid-defense" -Force
-Set-Location .\neon-grid-defense
-git init -b main
-git add .
-git commit -m "feat: Neon Grid Defense with 20 levels, CI/CD, and Windows batch scripts"
-git remote add origin https://github.com/<USERNAME>/neon-grid-defense.git
-git push -u origin main
+* **Live Web Demo:** [https://o1egkl.github.io/neon-grid-defense/](https://o1egkl.github.io/neon-grid-defense/)
+
+## Key Features
+* **20 Campaign Levels:** Fixed pre-designed enemy routes (1 to 4 spawn gates), obstacle walls, and `+20%` damage Boost pads.
+* **6 Towers with 5-Level Linear Upgrades:** Pulse, Cannon, Cryo, Tesla, Laser, and Railgun (`+20%` stats per level up to Lv. 5 Overdrive, `75%` credit refund on sell).
+* **7 Animated 3D Enemy Types:** Swarm, Trooper, Armored Tank, Shielded, Medic, Splitter, and Flying Drone.
+* **2-Click Ghost Placement & Safe Controls:** First click previews the 3D tower aimed toward the nearest road and shows its attack range; second click confirms build. Right-click cancels preview or closes the inspector (selling is only via the Inspector menu).
+* **Desktop & Android Camera Controls:** Mouse wheel / pinch-to-zoom, MMB / WASD / two-finger pan, `0` to reset camera.
+* **7 Languages:** English, Español, Русский, Português, Français, Deutsch, Italiano.
+
+## Project Structure
+* `scenes/main.tscn` — Main 3D game scene.
+* `scripts/grid_manager.gd` — Frontal 58° 3D camera, PBR board, Bezier-smoothed routes, combat, and 5-level upgrade visuals.
+* `scripts/ui_controller.gd` — Colored HUD, bottom tower shop, 2-click build bar, tower inspector, and settings/guide overlays.
+* `scripts/main.gd` — Game loop, economy, wave & level management.
+* `scripts/settings_manager.gd` — Persistent settings and 7-language localization.
+* `scripts/sfx_player.gd` — Procedural synthesized sound effects.
+* `data/towers.json`, `data/enemies.json`, `data/localization.json` — Tower, enemy, and localization data.
+* `data/levels/level_01.json` .. `level_20.json` + `campaign.json` — 20 campaign levels.
+* `assets/textures/`, `assets/sprites/` — Procedural PBR textures and 2.5D UI icons.
+* `play_windows.bat` / `build_windows.bat` — Relative-path Windows helper scripts.
+* `.github/workflows/release.yml` — CI/CD for Web (GitHub Pages), Windows, Linux, macOS, and Android.
+
+## Quick Start (Relative Paths)
+Run from the repository root directory:
+
+```bash
+# Import assets and launch with Godot 4.3+
+godot --headless --path . --import --quit
+godot --path .
 ```
-* Включите **Settings → Pages → Source: GitHub Actions** для автопубликации Web-версии при пуше в `main`.
-* Для выпуска релиза под все 5 платформ отправьте тег: `git tag v0.1.0; git push origin v0.1.0`.
+
+On Windows (from the repository root):
+```bat
+.\play_windows.bat
+```
+To build a standalone Windows executable (`builds/windows/NeonGridDefense.exe`):
+```bat
+.\build_windows.bat
+```
+
+## CI/CD & Releases
+* Enable **Settings -> Pages -> Source: GitHub Actions** to auto-publish the Web build on push to `main`.
+* Tag a release to build all 5 platforms (Web, Windows, Linux, macOS, Android):
+```bash
+git tag v0.1.0 && git push origin v0.1.0
+```
