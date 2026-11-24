@@ -174,34 +174,7 @@ func show_settings() -> void:
 	_guide_panel.visible = false
 	_levels_panel.visible = false
 	_result_panel.visible = false
-	_lbl_diff_title.text = SettingsManager.tr_key("diff_label")
-	_sync_difficulty_ui()
 	_sync_settings_controls()
-
-
-func _sync_difficulty_ui() -> void:
-	var cur_d: String = SettingsManager.difficulty
-	var colors := {"easy": Color("#10B981"), "hard": Color("#F59E0B"), "nightmare": Color("#EF4444")}
-	for did in ["easy", "hard", "nightmare"]:
-		var active: bool = (did == cur_d)
-		var col: Color = colors[did]
-		var txt: String = SettingsManager.tr_key("diff_" + did)
-		if _diff_buttons_settings.has(did):
-			var bs: Button = _diff_buttons_settings[did]
-			bs.text = txt
-			_style_button(bs, col, active)
-		if _diff_buttons_levels.has(did):
-			var bl: Button = _diff_buttons_levels[did]
-			bl.text = txt
-			_style_button(bl, col, active)
-	var desc_txt: String = SettingsManager.tr_key("diff_desc_" + cur_d)
-	var d_col: Color = colors.get(cur_d, Color("#10B981"))
-	if _lbl_diff_desc:
-		_lbl_diff_desc.text = desc_txt
-		_lbl_diff_desc.add_theme_color_override("font_color", d_col.lightened(0.25))
-	if _lbl_levels_diff_desc:
-		_lbl_levels_diff_desc.text = desc_txt
-		_lbl_levels_diff_desc.add_theme_color_override("font_color", d_col.lightened(0.25))
 	_apply_translations()
 	overlay_visibility_changed.emit(true)
 
@@ -881,34 +854,7 @@ func _build_settings_panel(parent: Control) -> void:
 		_style_button(sb, Color("#3B82F6"))
 		sb.pressed.connect(func():
 			SettingsManager.set_default_speed(spd)
-			_lbl_diff_title.text = SettingsManager.tr_key("diff_label")
-	_sync_difficulty_ui()
-	_sync_settings_controls()
-
-
-func _sync_difficulty_ui() -> void:
-	var cur_d: String = SettingsManager.difficulty
-	var colors := {"easy": Color("#10B981"), "hard": Color("#F59E0B"), "nightmare": Color("#EF4444")}
-	for did in ["easy", "hard", "nightmare"]:
-		var active: bool = (did == cur_d)
-		var col: Color = colors[did]
-		var txt: String = SettingsManager.tr_key("diff_" + did)
-		if _diff_buttons_settings.has(did):
-			var bs: Button = _diff_buttons_settings[did]
-			bs.text = txt
-			_style_button(bs, col, active)
-		if _diff_buttons_levels.has(did):
-			var bl: Button = _diff_buttons_levels[did]
-			bl.text = txt
-			_style_button(bl, col, active)
-	var desc_txt: String = SettingsManager.tr_key("diff_desc_" + cur_d)
-	var d_col: Color = colors.get(cur_d, Color("#10B981"))
-	if _lbl_diff_desc:
-		_lbl_diff_desc.text = desc_txt
-		_lbl_diff_desc.add_theme_color_override("font_color", d_col.lightened(0.25))
-	if _lbl_levels_diff_desc:
-		_lbl_levels_diff_desc.text = desc_txt
-		_lbl_levels_diff_desc.add_theme_color_override("font_color", d_col.lightened(0.25))
+					_sync_settings_controls()
 		)
 		speed_row.add_child(sb)
 		_speed_buttons.append(sb)
