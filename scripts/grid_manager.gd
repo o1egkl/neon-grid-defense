@@ -63,8 +63,10 @@ var _hover_box: MeshInstance3D
 var _hover_mat: StandardMaterial3D
 var _range_ring: MeshInstance3D
 var _range_mat: StandardMaterial3D
-var _next_range_ring: MeshInstance3D
+var _next_range_ring: Node3D
 var _next_range_mat: StandardMaterial3D
+var _last_ring_r: float = -1.0
+var _last_next_ring_r: float = -1.0
 var _core_sphere: MeshInstance3D
 var _core_ring_a: MeshInstance3D
 var _core_ring_b: MeshInstance3D
@@ -204,16 +206,8 @@ func _setup_containers() -> void:
 	_range_ring.visible = false
 	add_child(_range_ring)
 
-	_next_range_ring = MeshInstance3D.new()
-	var nrmesh := TorusMesh.new()
-	nrmesh.inner_radius = 0.97
-	nrmesh.outer_radius = 1.0
-	nrmesh.rings = 48
-	nrmesh.ring_segments = 8
-	_next_range_ring.mesh = nrmesh
-	_next_range_mat = _make_mat(Color("#FACC15"), 2.0, 0.45)
-	_next_range_ring.material_override = _next_range_mat
-	_next_range_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_next_range_ring = Node3D.new()
+	_next_range_mat = _make_mat(Color("#22C55E"), 2.2, 0.72)
 	_next_range_ring.visible = false
 	add_child(_next_range_ring)
 
@@ -986,6 +980,40 @@ func _pan_screen_delta(delta_px: Vector2) -> void:
 	_apply_camera_transform()
 
 
+func _set_solid_ring_radius(r: float) -> void:
+	if absf(r - _last_ring_r) < 0.02:
+		return
+	_last_ring_r = r
+	var tm := TorusMesh.new()
+	tm.inner_radius = maxf(0.1, r - 0.024)
+	tm.outer_radius = r + 0.024
+	tm.rings = 64
+	tm.ring_segments = 6
+	_range_ring.mesh = tm
+	_range_ring.scale = Vector3.ONE
+
+
+func _set_dashed_ring_radius(r: float) -> void:
+	if absf(r - _last_next_ring_r) < 0.02:
+		return
+	_last_next_ring_r = r
+	_clear_node_children(_next_range_ring)
+	var seg_count: int = 44
+	var step_ang: float = TAU / float(seg_count)
+	var dash_len: float = maxf(0.12, r * step_ang * 0.56)
+	var bm := BoxMesh.new()
+	bm.size = Vector3(dash_len, 0.025, 0.045)
+	for i in seg_count:
+		var ang: float = float(i) * step_ang
+		var seg := MeshInstance3D.new()
+		seg.mesh = bm
+		seg.material_override = _next_range_mat
+		seg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		seg.position = Vector3(cos(ang) * r, 0.0, sin(ang) * r)
+		seg.rotation.y = -ang + PI * 0.5
+		_next_range_ring.add_child(seg)
+
+
 func _update_hover_visuals() -> void:
 	if not input_enabled:
 		_hover_box.visible = false
@@ -1004,18 +1032,19 @@ func _update_hover_visuals() -> void:
 		_hover_mat.albedo_color = Color(1.0, 0.85, 0.15, 0.35)
 		_hover_mat.emission = Color("#FACC15")
 
+		_set_solid_ring_radius(cur_r)
 		_range_ring.visible = true
 		_range_ring.position = Vector3(ipos.x, 0.08, ipos.z)
-		_range_ring.scale = Vector3(cur_r, 1.0, cur_r)
-		_range_mat.albedo_color = Color(tcol.r, tcol.g, tcol.b, 0.72)
-		_range_mat.emission = tcol
+		var cur_col := Color("#00E5FF")
+		_range_mat.albedo_color = Color(cur_col.r, cur_col.g, cur_col.b, 0.85)
+		_range_mat.emission = cur_col
 
 		var lvl: int = int(t["level"])
 		if lvl < MAX_TOWER_LEVEL:
 			var next_r: float = float(t["base_range"]) * get_stat_mult(lvl + 1) * PX_TO_WORLD
+			_set_dashed_ring_radius(next_r)
 			_next_range_ring.visible = true
 			_next_range_ring.position = Vector3(ipos.x, 0.09, ipos.z)
-			_next_range_ring.scale = Vector3(next_r, 1.0, next_r)
 		else:
 			_next_range_ring.visible = false
 		return
@@ -1030,9 +1059,9 @@ func _update_hover_visuals() -> void:
 		_hover_mat.emission = pcol
 		if not selected_tower_config.is_empty():
 			var prng: float = float(selected_tower_config.get("range", 180.0)) * PX_TO_WORLD
+			_set_solid_ring_radius(prng)
 			_range_ring.visible = true
 			_range_ring.position = Vector3(ppos.x, 0.08, ppos.z)
-			_range_ring.scale = Vector3(prng, 1.0, prng)
 			_range_mat.albedo_color = Color(pcol.r, pcol.g, pcol.b, 0.72)
 			_range_mat.emission = pcol
 		else:
@@ -1055,9 +1084,9 @@ func _update_hover_visuals() -> void:
 	if _can_place_hover and not selected_tower_config.is_empty():
 		var rng: float = float(selected_tower_config.get("range", 180.0)) * PX_TO_WORLD
 		var tcol := Color(str(selected_tower_config.get("color", "#00E5FF")))
+		_set_solid_ring_radius(rng)
 		_range_ring.visible = true
 		_range_ring.position = Vector3(pos.x, 0.08, pos.z)
-		_range_ring.scale = Vector3(rng, 1.0, rng)
 		_range_mat.albedo_color = Color(tcol.r, tcol.g, tcol.b, 0.65)
 		_range_mat.emission = tcol
 	else:
@@ -1471,6 +1500,8 @@ func _process(delta: float) -> void:
 		_core_ring_a.rotation.y = _anim_time * 1.1
 	if is_instance_valid(_core_ring_b):
 		_core_ring_b.rotation.y = -_anim_time * 0.7
+	if is_instance_valid(_next_range_ring) and _next_range_ring.visible:
+		_next_range_ring.rotation.y = -_anim_time * 0.25
 
 	if _core_flash > 0.0:
 		_core_flash = maxf(0.0, _core_flash - delta * 2.5)
