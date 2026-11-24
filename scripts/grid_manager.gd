@@ -473,7 +473,7 @@ func _make_pbr_mat(col: Color, albedo_tex: Texture2D, normal_tex: Texture2D = nu
 	if normal_tex:
 		m.normal_enabled = true
 		m.normal_texture = normal_tex
-		m.normal_scale = 1.15
+		m.normal_scale = 0.55
 	if rough_tex:
 		m.roughness_texture = rough_tex
 	return m
@@ -677,9 +677,9 @@ func _build_3d_board() -> void:
 	var w_nrm := _load_tex("res://assets/textures/wall_normal.png")
 	var b_alb := _load_tex("res://assets/textures/boost_albedo.png")
 
-	var mat_empty := _make_pbr_mat(Color.WHITE if t_alb else Color("#1A263A"), t_alb, t_nrm, t_rgh, 0.62, 0.42)
-	var mat_road := _make_pbr_mat(Color.WHITE if r_alb else Color("#0D1C2E"), r_alb, r_nrm, null, 0.45, 0.46, 0.05)
-	var mat_wall := _make_pbr_mat(Color.WHITE if w_alb else Color("#2B3D56"), w_alb, w_nrm, t_rgh, 0.72, 0.35, 0.03)
+	var mat_empty := _make_pbr_mat(Color.WHITE if t_alb else Color("#1A263A"), t_alb, t_nrm, t_rgh, 0.48, 0.58)
+	var mat_road := _make_pbr_mat(Color.WHITE if r_alb else Color("#0D1C2E"), r_alb, r_nrm, null, 0.35, 0.58, 0.05)
+	var mat_wall := _make_pbr_mat(Color.WHITE if w_alb else Color("#2B3D56"), w_alb, w_nrm, t_rgh, 0.55, 0.48, 0.03)
 	var mat_boost := _make_pbr_mat(Color.WHITE if b_alb else Color("#103B34"), b_alb, t_nrm, t_rgh, 0.52, 0.32, 0.22)
 	var mat_boost_ring := _make_mat(Color("#10B981"), 2.4, 1.0, 0.2, 0.2)
 	var mat_portal_ring := _make_mat(Color("#F97316"), 3.0, 1.0, 0.1, 0.15)
