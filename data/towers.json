@@ -30,7 +30,7 @@
       "damage": 5,
       "slow_factor": 0.4,
       "damage_type": "cryo",
-      "color": "#00E5FF"
+      "color": "#5EEAD4"
     },
     {
       "id": "tesla",

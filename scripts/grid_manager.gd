@@ -1359,27 +1359,79 @@ func _build_rotating_tower(tid: String, col: Color, on_boost: bool) -> Dictionar
 			muzzle.position = Vector3(0.0, 0.38, 0.50)
 
 		"cryo":
-			var crystal := MeshInstance3D.new()
+			var titanium_mat := _make_unit_mat(Color("#E2E8F0"), 0.05)
+			var frost_white_mat := _make_mat(Color("#F0F9FF"), 2.1, 0.96, 0.05, 0.08)
+			var mint_ring_mat := _make_mat(Color("#5EEAD4"), 2.4, 0.92, 0.1, 0.12)
+			# 3 наклонные титановые опоры-излучатели под углом 120°
+			for idx in 3:
+				var ang: float = deg_to_rad(float(idx) * 120.0 + 30.0)
+				var prong := Node3D.new()
+				prong.rotation.y = ang
+				head.add_child(prong)
+
+				var joint := MeshInstance3D.new()
+				var jm := CylinderMesh.new()
+				jm.top_radius = 0.075
+				jm.bottom_radius = 0.075
+				jm.height = 0.14
+				joint.mesh = jm
+				joint.rotation_degrees = Vector3(0.0, 0.0, 90.0)
+				joint.position = Vector3(0.0, 0.02, 0.22)
+				joint.material_override = dark_mat
+				prong.add_child(joint)
+
+				var low_arm := MeshInstance3D.new()
+				var lam := BoxMesh.new()
+				lam.size = Vector3(0.11, 0.24, 0.10)
+				low_arm.mesh = lam
+				low_arm.position = Vector3(0.0, 0.12, 0.30)
+				low_arm.rotation_degrees = Vector3(36.0, 0.0, 0.0)
+				low_arm.material_override = titanium_mat
+				prong.add_child(low_arm)
+
+				var up_arm := MeshInstance3D.new()
+				var uam := BoxMesh.new()
+				uam.size = Vector3(0.095, 0.34, 0.085)
+				up_arm.mesh = uam
+				up_arm.position = Vector3(0.0, 0.36, 0.31)
+				up_arm.rotation_degrees = Vector3(-16.0, 0.0, 0.0)
+				up_arm.material_override = titanium_mat
+				prong.add_child(up_arm)
+
+			# Парящий ледяно-белый кристалл + наклонное мятное кольцо (вращаются в barrel_group)
+			barrel_group.position.y = 0.38
+			var top_c := MeshInstance3D.new()
 			var cyl := CylinderMesh.new()
 			cyl.top_radius = 0.01
-			cyl.bottom_radius = 0.22
-			cyl.height = 0.66
+			cyl.bottom_radius = 0.19
+			cyl.height = 0.36
 			cyl.radial_segments = 6
-			crystal.mesh = cyl
-			crystal.position = Vector3(0.0, 0.36, 0.0)
-			crystal.material_override = _make_mat(col, 2.6, 0.92, 0.1, 0.1)
-			head.add_child(crystal)
+			top_c.mesh = cyl
+			top_c.position = Vector3(0.0, 0.18, 0.0)
+			top_c.material_override = frost_white_mat
+			barrel_group.add_child(top_c)
+
 			var bot_c := MeshInstance3D.new()
 			var cyl2 := CylinderMesh.new()
-			cyl2.top_radius = 0.22
+			cyl2.top_radius = 0.19
 			cyl2.bottom_radius = 0.01
-			cyl2.height = 0.22
+			cyl2.height = 0.28
 			cyl2.radial_segments = 6
 			bot_c.mesh = cyl2
-			bot_c.position = Vector3(0.0, -0.06, 0.0)
-			bot_c.material_override = _make_mat(col, 2.2, 0.90, 0.1, 0.1)
-			head.add_child(bot_c)
-			muzzle.position = Vector3(0.0, 0.35, 0.0)
+			bot_c.position = Vector3(0.0, -0.14, 0.0)
+			bot_c.material_override = frost_white_mat
+			barrel_group.add_child(bot_c)
+
+			var gyro := MeshInstance3D.new()
+			var gtm := TorusMesh.new()
+			gtm.inner_radius = 0.25
+			gtm.outer_radius = 0.30
+			gtm.rings = 24
+			gyro.mesh = gtm
+			gyro.rotation_degrees = Vector3(32.0, 0.0, 18.0)
+			gyro.material_override = mint_ring_mat
+			barrel_group.add_child(gyro)
+			muzzle.position = Vector3(0.0, 0.04, 0.0)
 
 		"tesla":
 			var spire := MeshInstance3D.new()
@@ -1564,12 +1616,12 @@ func _animate_idle_towers(dt: float) -> void:
 		var tid: String = str(t.get("id", "pulse"))
 		var head: Node3D = t.get("head", null)
 		var bg: Node3D = t.get("barrel_group", null)
-		if tid == "cryo" and is_instance_valid(head):
-			head.rotation.y += dt * 1.5
-			head.position.y = 0.36 + sin(_anim_time * 3.0 + float(cell.x)) * 0.05
+		if tid == "cryo" and is_instance_valid(bg):
+			bg.rotation.y += dt * 1.8
+			bg.position.y = 0.38 + sin(_anim_time * 3.0 + float(cell.x)) * 0.045
 		if float(t["recoil"]) > 0.0:
 			t["recoil"] = maxf(0.0, float(t["recoil"]) - dt * 7.0)
-			if is_instance_valid(bg):
+			if is_instance_valid(bg) and tid != "cryo":
 				bg.position.z = -float(t["recoil"]) * 0.14
 
 
