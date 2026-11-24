@@ -47,8 +47,10 @@ func _ready() -> void:
 
 	ui.overlay_visibility_changed.connect(_on_overlay_changed)
 	ui.level_selected.connect(_load_level)
-	ui.prev_level_requested.connect(func(): _load_level(wrapi(current_level_index - 1, 1, max_levels + 1)))
-	ui.next_level_requested.connect(func(): _load_level(wrapi(current_level_index + 1, 1, max_levels + 1)))
+	ui.next_level_requested.connect(func():
+		if current_level_index < max_levels:
+			_load_level(current_level_index + 1)
+	)
 	ui.retry_level_requested.connect(func(): _load_level(current_level_index))
 	ui.start_wave_requested.connect(_on_start_wave)
 	ui.speed_cycle_requested.connect(_on_cycle_speed)
@@ -118,10 +120,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			_select_tower(str(level_towers[idx].get("id", "pulse")))
 		return
 
-	if ke.keycode == KEY_BRACKETRIGHT or ke.keycode == KEY_PAGEDOWN:
-		_load_level(wrapi(current_level_index + 1, 1, max_levels + 1))
-	elif ke.keycode == KEY_BRACKETLEFT or ke.keycode == KEY_PAGEUP:
-		_load_level(wrapi(current_level_index - 1, 1, max_levels + 1))
+	pass
 
 
 func _on_overlay_changed(is_open: bool) -> void:
@@ -129,6 +128,8 @@ func _on_overlay_changed(is_open: bool) -> void:
 
 
 func _load_level(idx: int) -> void:
+	if not SettingsManager.is_level_unlocked(idx):
+		return
 	current_level_index = idx
 	inspected_cell = Vector2i(-1, -1)
 	ui.hide_inspector()

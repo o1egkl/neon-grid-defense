@@ -116,6 +116,12 @@ func is_level_completed(level_id: int) -> bool:
 	return level_id in completed_levels
 
 
+func is_level_unlocked(level_id: int) -> bool:
+	if level_id <= 1:
+		return true
+	return is_level_completed(level_id) or is_level_completed(level_id - 1)
+
+
 func mark_level_completed(level_id: int) -> void:
 	if level_id < 1 or level_id > 20:
 		return

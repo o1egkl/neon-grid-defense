@@ -15,7 +15,6 @@ signal zoom_in_requested()
 signal zoom_out_requested()
 signal reset_camera_requested()
 signal level_selected(level_id: int)
-signal prev_level_requested()
 signal next_level_requested()
 signal retry_level_requested()
 signal tower_selected(tower_id: String)
@@ -37,8 +36,7 @@ var _last_result_is_victory: bool = true
 
 # HUD
 var _hud_bar: PanelContainer
-var _pill_level: PanelContainer
-var _lbl_level: Label
+var _btn_level_pill: Button
 var _pill_diff: PanelContainer
 var _lbl_diff: Label
 var _pill_credits: PanelContainer
@@ -52,11 +50,8 @@ var _hud_btn_zoom_in: Button
 var _hud_btn_reset_cam: Button
 var _status_toast: PanelContainer
 var _hud_status_label: Label
-var _hud_btn_prev: Button
-var _hud_btn_next: Button
 var _hud_btn_wave: Button
 var _hud_btn_speed: Button
-var _hud_btn_levels: Button
 var _hud_btn_guide: Button
 var _hud_btn_settings: Button
 
@@ -260,9 +255,9 @@ func update_shop_state(selected_id: String, gold: int) -> void:
 
 func update_hud(level_name: String, gold: int, cores: int, cur_wave: int, total_waves: int, msg_key: String) -> void:
 	_current_gold = gold
-	if not _lbl_level:
+	if not _btn_level_pill:
 		return
-	_lbl_level.text = level_name.to_upper()
+	_btn_level_pill.text = level_name.to_upper()
 	var d_mods: Dictionary = SettingsManager.get_difficulty_mods()
 	var d_id: String = str(d_mods.get("id", "easy"))
 	var d_col := Color(str(d_mods.get("color", "#10B981")))
@@ -375,23 +370,18 @@ func _build_hud() -> void:
 	hbox.add_theme_constant_override("v_separation", 6)
 	_hud_bar.add_child(hbox)
 
-	_hud_btn_prev = Button.new()
-	_hud_btn_prev.text = "<"
-	_hud_btn_prev.custom_minimum_size = Vector2(30, 30)
-	_style_button(_hud_btn_prev)
-	_hud_btn_prev.pressed.connect(func(): prev_level_requested.emit())
-	hbox.add_child(_hud_btn_prev)
-
-	_hud_btn_next = Button.new()
-	_hud_btn_next.text = ">"
-	_hud_btn_next.custom_minimum_size = Vector2(30, 30)
-	_style_button(_hud_btn_next)
-	_hud_btn_next.pressed.connect(func(): next_level_requested.emit())
-	hbox.add_child(_hud_btn_next)
-
-	var p_lvl: Array = _make_hud_pill(hbox, Color("#071E2E"), Color("#00E5FF"), Color("#E0F7FA"))
-	_pill_level = p_lvl[0]
-	_lbl_level = p_lvl[1]
+	_btn_level_pill = Button.new()
+	_btn_level_pill.custom_minimum_size = Vector2(140, 32)
+	_btn_level_pill.add_theme_font_size_override("font_size", 13)
+	_btn_level_pill.add_theme_color_override("font_color", Color("#E0F7FA"))
+	_btn_level_pill.add_theme_color_override("font_hover_color", Color("#FFFFFF"))
+	var lvl_n := _make_pill_style(Color("#071E2E"), Color("#00E5FF"))
+	var lvl_h := _make_pill_style(Color("#0C3048"), Color("#38BDF8"))
+	_btn_level_pill.add_theme_stylebox_override("normal", lvl_n)
+	_btn_level_pill.add_theme_stylebox_override("hover", lvl_h)
+	_btn_level_pill.add_theme_stylebox_override("pressed", lvl_h)
+	_btn_level_pill.pressed.connect(show_levels)
+	hbox.add_child(_btn_level_pill)
 
 	var p_dif: Array = _make_hud_pill(hbox, Color("#07221B"), Color("#10B981"), Color("#6EE7B7"))
 	_pill_diff = p_dif[0]
@@ -461,11 +451,6 @@ func _build_hud() -> void:
 	_style_button(_hud_btn_reset_cam, Color("#00E5FF"))
 	_hud_btn_reset_cam.pressed.connect(func(): reset_camera_requested.emit())
 	hbox.add_child(_hud_btn_reset_cam)
-
-	_hud_btn_levels = Button.new()
-	_style_button(_hud_btn_levels, Color("#3B82F6"))
-	_hud_btn_levels.pressed.connect(show_levels)
-	hbox.add_child(_hud_btn_levels)
 
 	_hud_btn_guide = Button.new()
 	_style_button(_hud_btn_guide, Color("#10B981"))
@@ -1180,15 +1165,21 @@ func _rebuild_level_buttons() -> void:
 		var nm: String = str(lvl.get("name", "Level %02d" % id))
 		var w: int = int(lvl.get("waves", 10))
 		var done: bool = SettingsManager.is_level_completed(id)
+		var unlocked: bool = SettingsManager.is_level_unlocked(id)
 		var b := Button.new()
-		b.text = "%s%s\n(%d %s)" % [nm, " [OK]" if done else "", w, waves_word]
 		b.custom_minimum_size = Vector2(175, 62)
-		var b_col: Color = Color("#10B981") if done else (Color("#00E5FF") if not bool(lvl.get("has_air", false)) else Color("#F97316"))
-		_style_button(b, b_col, done)
-		b.pressed.connect(func():
-			level_selected.emit(id)
-			close_overlays()
-		)
+		if unlocked:
+			b.text = "%s%s\n(%d %s)" % [nm, " [OK]" if done else "", w, waves_word]
+			var b_col: Color = Color("#10B981") if done else (Color("#00E5FF") if not bool(lvl.get("has_air", false)) else Color("#F97316"))
+			_style_button(b, b_col, done)
+			b.pressed.connect(func():
+				level_selected.emit(id)
+				close_overlays()
+			)
+		else:
+			b.text = "%s\n[%s]" % [nm, SettingsManager.tr_key("lbl_locked")]
+			b.disabled = true
+			_style_button(b, Color("#475569"), false, true)
 		_levels_grid.add_child(b)
 
 
@@ -1236,7 +1227,6 @@ func _apply_translations() -> void:
 	_btn_open_guide.text = SettingsManager.tr_key("btn_how_to_play")
 	_btn_open_levels.text = SettingsManager.tr_key("btn_levels")
 
-	_hud_btn_levels.text = SettingsManager.tr_key("btn_levels")
 	var vp_w: float = get_viewport().get_visible_rect().size.x
 	_hud_btn_guide.text = "?" if vp_w < 1260.0 else ("? " + SettingsManager.tr_key("btn_how_to_play"))
 	_hud_btn_settings.text = SettingsManager.tr_key("btn_settings")
