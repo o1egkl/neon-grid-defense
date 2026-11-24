@@ -84,7 +84,7 @@ var _round_robin_spawn: int = 0
 var _anim_time: float = 0.0
 
 # Camera Zoom & Pan (Desktop Wheel + MMB/WASD + Android 2-Finger Pinch)
-var _base_cam_size: float = 20.4
+var _base_cam_size: float = 24.0
 var _zoom_factor: float = 1.0
 var _target_zoom: float = 1.0
 var _pan_offset := Vector3.ZERO
@@ -210,9 +210,9 @@ func _update_camera_fit() -> void:
 		return
 	var vp: Vector2 = get_viewport().get_visible_rect().size
 	var aspect: float = maxf(vp.x / maxf(vp.y, 1.0), 0.5)
-	_base_cam_size = 20.4
+	_base_cam_size = 24.0
 	if aspect < 1.65:
-		_base_cam_size = 20.4 * (1.65 / aspect)
+		_base_cam_size = 24.0 * (1.65 / aspect)
 	_apply_camera_transform()
 
 
@@ -225,7 +225,7 @@ func _apply_camera_transform() -> void:
 	_pan_offset.z = clampf(_pan_offset.z, -max_pz, max_pz)
 	var center := Vector3(float(grid_size.x) * 0.5, 0.0, float(grid_size.y) * 0.5) + _pan_offset
 	var offset := Vector3(0.0, 26.0, 21.0).rotated(Vector3.UP, deg_to_rad(30.0))
-	_camera.look_at_from_position(center + offset, center + Vector3(0.0, -0.3, 0.6), Vector3.UP)
+	_camera.look_at_from_position(center + offset, center + Vector3(0.0, -0.2, 0.9), Vector3.UP)
 	_camera.size = _base_cam_size * _zoom_factor
 
 
