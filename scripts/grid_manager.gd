@@ -84,7 +84,7 @@ var _round_robin_spawn: int = 0
 var _anim_time: float = 0.0
 
 # Camera Zoom & Pan (Desktop Wheel + MMB/WASD + Android 2-Finger Pinch)
-var _base_cam_size: float = 24.0
+var _base_cam_dist: float = 25.0
 var _zoom_factor: float = 1.0
 var _target_zoom: float = 1.0
 var _pan_offset := Vector3.ZERO
@@ -124,15 +124,15 @@ func _setup_environment_and_camera() -> void:
 
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("#060A12")
+	env.background_color = Color("#050911")
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("#2B405E")
-	env.ambient_light_energy = 0.72
+	env.ambient_light_color = Color("#273D5C")
+	env.ambient_light_energy = 0.62
 	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	env.glow_enabled = true
-	env.glow_intensity = 0.55
-	env.glow_bloom = 0.05
-	env.glow_hdr_threshold = 1.25
+	env.glow_intensity = 0.65
+	env.glow_bloom = 0.06
+	env.glow_hdr_threshold = 1.20
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
 
 	var we := WorldEnvironment.new()
@@ -140,21 +140,27 @@ func _setup_environment_and_camera() -> void:
 	add_child(we)
 
 	var sun := DirectionalLight3D.new()
-	sun.light_color = Color("#E6F2FF")
-	sun.light_energy = 1.35
-	sun.rotation_degrees = Vector3(-52.0, 38.0, 0.0)
+	sun.light_color = Color("#EAF4FF")
+	sun.light_energy = 1.55
+	sun.rotation_degrees = Vector3(-54.0, 32.0, 0.0)
+	sun.shadow_enabled = true
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+	sun.directional_shadow_max_distance = 55.0
+	sun.shadow_bias = 0.03
+	sun.shadow_normal_bias = 1.2
 	add_child(sun)
 
 	var rim := DirectionalLight3D.new()
-	rim.light_color = Color("#00B8D9")
-	rim.light_energy = 0.50
-	rim.rotation_degrees = Vector3(-28.0, -140.0, 0.0)
+	rim.light_color = Color("#00C8EA")
+	rim.light_energy = 0.65
+	rim.rotation_degrees = Vector3(-28.0, -145.0, 0.0)
 	add_child(rim)
 
 	_camera = Camera3D.new()
-	_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	_camera.near = 0.1
-	_camera.far = 160.0
+	_camera.projection = Camera3D.PROJECTION_PERSPECTIVE
+	_camera.fov = 34.0
+	_camera.near = 0.5
+	_camera.far = 180.0
 	add_child(_camera)
 	_camera.current = true
 
@@ -177,6 +183,7 @@ func _setup_containers() -> void:
 	_hover_box.mesh = hmesh
 	_hover_mat = _make_mat(Color("#00E5FF"), 1.6, 0.35)
 	_hover_box.material_override = _hover_mat
+	_hover_box.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_hover_box.visible = false
 	add_child(_hover_box)
 
@@ -189,6 +196,7 @@ func _setup_containers() -> void:
 	_range_ring.mesh = rmesh
 	_range_mat = _make_mat(Color("#00E5FF"), 2.0, 0.75)
 	_range_ring.material_override = _range_mat
+	_range_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_range_ring.visible = false
 	add_child(_range_ring)
 
@@ -201,6 +209,7 @@ func _setup_containers() -> void:
 	_next_range_ring.mesh = nrmesh
 	_next_range_mat = _make_mat(Color("#FACC15"), 2.0, 0.45)
 	_next_range_ring.material_override = _next_range_mat
+	_next_range_ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_next_range_ring.visible = false
 	add_child(_next_range_ring)
 
@@ -210,23 +219,26 @@ func _update_camera_fit() -> void:
 		return
 	var vp: Vector2 = get_viewport().get_visible_rect().size
 	var aspect: float = maxf(vp.x / maxf(vp.y, 1.0), 0.5)
-	_base_cam_size = 24.0
-	if aspect < 1.65:
-		_base_cam_size = 24.0 * (1.65 / aspect)
+	var half_w: float = (float(grid_size.x) + 1.4) * 0.5
+	var req_half_h_w: float = half_w / aspect
+	var req_half_h_z: float = (float(grid_size.y) + 2.8) * 0.5 * 0.848
+	var req_half_h: float = maxf(req_half_h_w, req_half_h_z)
+	_base_cam_dist = req_half_h / maxf(tan(deg_to_rad(_camera.fov * 0.5)), 0.1)
 	_apply_camera_transform()
 
 
 func _apply_camera_transform() -> void:
 	if not _camera:
 		return
-	var max_px: float = float(grid_size.x) * 0.42
-	var max_pz: float = float(grid_size.y) * 0.45
+	var max_px: float = float(grid_size.x) * 0.44
+	var max_pz: float = float(grid_size.y) * 0.46
 	_pan_offset.x = clampf(_pan_offset.x, -max_px, max_px)
 	_pan_offset.z = clampf(_pan_offset.z, -max_pz, max_pz)
-	var center := Vector3(float(grid_size.x) * 0.5, 0.0, float(grid_size.y) * 0.5) + _pan_offset
-	var offset := Vector3(0.0, 26.0, 21.0).rotated(Vector3.UP, deg_to_rad(30.0))
-	_camera.look_at_from_position(center + offset, center + Vector3(0.0, -0.2, 0.9), Vector3.UP)
-	_camera.size = _base_cam_size * _zoom_factor
+	var dist: float = _base_cam_dist * _zoom_factor
+	var pitch_rad: float = deg_to_rad(58.0)
+	var offset := Vector3(0.0, sin(pitch_rad) * dist, cos(pitch_rad) * dist)
+	var center := Vector3(float(grid_size.x) * 0.5, 0.0, float(grid_size.y) * 0.5 + 0.35) + _pan_offset
+	_camera.look_at_from_position(center + offset, center, Vector3.UP)
 
 
 func zoom_by(multiplier: float) -> void:
@@ -402,8 +414,34 @@ func _make_mat(col: Color, emission_strength: float = 0.0, alpha: float = 1.0, m
 	return m
 
 
+func _load_tex(path: String) -> Texture2D:
+	if ResourceLoader.exists(path):
+		return load(path) as Texture2D
+	return null
+
+
+func _make_pbr_mat(col: Color, albedo_tex: Texture2D, normal_tex: Texture2D = null, rough_tex: Texture2D = null, metallic: float = 0.60, roughness: float = 0.42, emission_str: float = 0.0) -> StandardMaterial3D:
+	var m := _make_mat(col, emission_str, 1.0, metallic, roughness)
+	if albedo_tex:
+		m.albedo_texture = albedo_tex
+		m.albedo_color = Color(1.0, 1.0, 1.0, 1.0) if col == Color.WHITE else col
+	if normal_tex:
+		m.normal_enabled = true
+		m.normal_texture = normal_tex
+		m.normal_scale = 1.15
+	if rough_tex:
+		m.roughness_texture = rough_tex
+	return m
+
+
 func _make_unit_mat(col: Color, emission_strength: float = 0.0) -> StandardMaterial3D:
-	var m := _make_mat(col, emission_strength, 1.0, 0.18, 0.56)
+	var m := _make_mat(col, emission_strength, 1.0, 0.25, 0.48)
+	var ntex := _load_tex("res://assets/textures/tile_normal.png")
+	if ntex:
+		m.normal_enabled = true
+		m.normal_texture = ntex
+		m.normal_scale = 0.55
+		m.uv1_scale = Vector3(1.5, 1.5, 1.5)
 	if _outline_mat:
 		m.next_pass = _outline_mat
 	return m
@@ -580,10 +618,19 @@ func _build_3d_board() -> void:
 	var wall_mesh := BoxMesh.new()
 	wall_mesh.size = Vector3(0.88, 0.56, 0.88)
 
-	var mat_empty := _make_mat(Color("#1A263A"), 0.0, 1.0, 0.62, 0.36)
-	var mat_road := _make_mat(Color("#0D1C2E"), 0.10, 1.0, 0.45, 0.45)
-	var mat_wall := _make_mat(Color("#2B3D56"), 0.05, 1.0, 0.70, 0.32)
-	var mat_boost := _make_mat(Color("#103B34"), 0.45, 1.0, 0.50, 0.32)
+	var t_alb := _load_tex("res://assets/textures/tile_albedo.png")
+	var t_nrm := _load_tex("res://assets/textures/tile_normal.png")
+	var t_rgh := _load_tex("res://assets/textures/tile_roughness.png")
+	var r_alb := _load_tex("res://assets/textures/road_albedo.png")
+	var r_nrm := _load_tex("res://assets/textures/road_normal.png")
+	var w_alb := _load_tex("res://assets/textures/wall_albedo.png")
+	var w_nrm := _load_tex("res://assets/textures/wall_normal.png")
+	var b_alb := _load_tex("res://assets/textures/boost_albedo.png")
+
+	var mat_empty := _make_pbr_mat(Color.WHITE if t_alb else Color("#1A263A"), t_alb, t_nrm, t_rgh, 0.62, 0.42)
+	var mat_road := _make_pbr_mat(Color.WHITE if r_alb else Color("#0D1C2E"), r_alb, r_nrm, null, 0.45, 0.46, 0.05)
+	var mat_wall := _make_pbr_mat(Color.WHITE if w_alb else Color("#2B3D56"), w_alb, w_nrm, t_rgh, 0.72, 0.35, 0.03)
+	var mat_boost := _make_pbr_mat(Color.WHITE if b_alb else Color("#103B34"), b_alb, t_nrm, t_rgh, 0.52, 0.32, 0.22)
 	var mat_boost_ring := _make_mat(Color("#10B981"), 2.4, 1.0, 0.2, 0.2)
 	var mat_portal_ring := _make_mat(Color("#F97316"), 3.0, 1.0, 0.1, 0.15)
 	var mat_portal_core := _make_mat(Color("#FB923C"), 2.2, 0.55, 0.0, 0.1)
@@ -623,6 +670,7 @@ func _build_3d_board() -> void:
 				ring.mesh = boost_ring_mesh
 				ring.position = Vector3(pos.x, 0.02, pos.z)
 				ring.material_override = mat_boost_ring
+				ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 				_board_root.add_child(ring)
 			CellType.SPAWN:
 				tile.mesh = road_mesh
@@ -711,25 +759,51 @@ func _build_energy_core(pos: Vector3) -> void:
 
 func _build_3d_routes() -> void:
 	_clear_node_children(_route_root)
-	var line_mat := _make_mat(Color("#00D8F5"), 1.35, 0.90, 0.1, 0.25)
+	var line_mat := _make_mat(Color("#00D8F5"), 1.35, 0.85, 0.1, 0.25)
 	var joint_mesh := SphereMesh.new()
 	joint_mesh.radius = 0.042
 	joint_mesh.height = 0.084
 
+	var chev_tex := _load_tex("res://assets/textures/chevron.png")
+	var chev_mesh := QuadMesh.new()
+	chev_mesh.size = Vector2(0.54, 0.54)
+	var chev_mat := StandardMaterial3D.new()
+	chev_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	chev_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	chev_mat.albedo_color = Color(0.25, 0.94, 1.0, 0.82)
+	if chev_tex:
+		chev_mat.albedo_texture = chev_tex
+
 	for spath in smooth_paths:
 		var pts: PackedVector3Array = spath
+		var dist_accum: float = 0.75
 		for i in range(pts.size() - 1):
 			var a: Vector3 = pts[i] + Vector3(0.0, -0.02, 0.0)
 			var b: Vector3 = pts[i + 1] + Vector3(0.0, -0.02, 0.0)
-			if a.distance_to(b) < 0.01:
+			var seg_len: float = a.distance_to(b)
+			if seg_len < 0.01:
 				continue
-			var seg := _create_beam_mesh(a, b, 0.075, line_mat)
+			var seg := _create_beam_mesh(a, b, 0.065, line_mat)
+			seg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_route_root.add_child(seg)
 			var cap := MeshInstance3D.new()
 			cap.mesh = joint_mesh
 			cap.position = b
 			cap.material_override = line_mat
+			cap.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_route_root.add_child(cap)
+			if chev_tex:
+				dist_accum += seg_len
+				if dist_accum >= 1.75:
+					dist_accum = 0.0
+					var dir: Vector3 = (b - a).normalized()
+					var chev := MeshInstance3D.new()
+					chev.mesh = chev_mesh
+					chev.material_override = chev_mat
+					chev.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+					chev.position = (a + b) * 0.5 + Vector3(0.0, 0.015, 0.0)
+					chev.rotation = Vector3(-PI * 0.5, atan2(-dir.x, -dir.z), 0.0)
+					_route_root.add_child(chev)
 	_route_root.visible = SettingsManager.show_path_preview
 
 
@@ -842,7 +916,9 @@ func _pan_screen_delta(delta_px: Vector2) -> void:
 	if not _camera:
 		return
 	var vp_h: float = maxf(get_viewport().get_visible_rect().size.y, 1.0)
-	var world_per_px: float = _camera.size / vp_h
+	var dist: float = _base_cam_dist * _zoom_factor
+	var half_h: float = dist * tan(deg_to_rad(_camera.fov * 0.5))
+	var world_per_px: float = (half_h * 2.0) / vp_h
 	var cam_right: Vector3 = _camera.global_transform.basis.x
 	var cam_fwd: Vector3 = -_camera.global_transform.basis.z
 	cam_right.y = 0.0
@@ -1872,13 +1948,20 @@ func _fire_tower(tid: String, cfg: Dictionary, origin: Vector3, target_idx: int,
 func _spawn_muzzle_flash(pos: Vector3, col: Color) -> void:
 	var mi := MeshInstance3D.new()
 	var sm := SphereMesh.new()
-	sm.radius = 0.14
-	sm.height = 0.28
+	sm.radius = 0.15
+	sm.height = 0.30
 	mi.mesh = sm
 	mi.position = pos
-	mi.material_override = _make_mat(col.lightened(0.4), 3.6, 0.95, 0.0, 0.1)
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.material_override = _make_mat(col.lightened(0.4), 3.8, 0.95, 0.0, 0.1)
+	if _vfx.size() < 16:
+		var fl := OmniLight3D.new()
+		fl.light_color = col
+		fl.light_energy = 2.4
+		fl.omni_range = 3.2
+		mi.add_child(fl)
 	_fx_root.add_child(mi)
-	_vfx.append({"node": mi, "type": "beam", "ttl": 0.07, "max_ttl": 0.07})
+	_vfx.append({"node": mi, "type": "beam", "ttl": 0.08, "max_ttl": 0.08})
 
 
 func _spawn_projectile(origin: Vector3, dest: Vector3, spd: float, dmg: float, dtype: String, aoe: float, col: Color, is_crit: bool) -> void:
