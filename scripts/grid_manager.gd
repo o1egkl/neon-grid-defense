@@ -95,6 +95,9 @@ var _zoom_factor: float = 1.0
 var _target_zoom: float = 1.0
 var _pan_offset := Vector3.ZERO
 var _mmb_dragging: bool = false
+var _lmb_down: bool = false
+var _lmb_dragging: bool = false
+var _lmb_down_pos := Vector2.ZERO
 var _touches: Dictionary = {} # finger_idx -> Vector2
 var _prev_pinch_dist: float = 0.0
 var _prev_pinch_center := Vector2.ZERO
@@ -228,8 +231,9 @@ func _update_camera_fit() -> void:
 func _apply_camera_transform() -> void:
 	if not _camera:
 		return
-	var max_px: float = float(grid_size.x) * 0.44
-	var max_pz: float = float(grid_size.y) * 0.46
+	var pan_mult: float = clampf(0.85 - _zoom_factor * 0.40, 0.35, 0.56)
+	var max_px: float = float(grid_size.x) * pan_mult
+	var max_pz: float = float(grid_size.y) * (pan_mult + 0.04)
 	_pan_offset.x = clampf(_pan_offset.x, -max_px, max_px)
 	_pan_offset.z = clampf(_pan_offset.z, -max_pz, max_pz)
 	var dist: float = _base_cam_dist * _zoom_factor
@@ -889,12 +893,14 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not input_enabled:
 		return
 
-	# Android / Touch: 2-finger Pinch-to-Zoom & Pan
+	# Android / Touch: 2-finger Pinch-to-Zoom & Pan (1-finger drag handled via LMB drag-to-pan)
 	if event is InputEventScreenTouch:
 		var st: InputEventScreenTouch = event
 		if st.pressed:
 			_touches[st.index] = st.position
-			if _touches.size() == 2:
+			if _touches.size() >= 2:
+				_lmb_down = false
+				_lmb_dragging = false
 				var ks: Array = _touches.keys()
 				var p0: Vector2 = _touches[ks[0]]
 				var p1: Vector2 = _touches[ks[1]]
@@ -910,8 +916,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventScreenDrag:
 		var sd: InputEventScreenDrag = event
 		_touches[sd.index] = sd.position
-		if _touches.size() == 2:
+		if _touches.size() >= 2:
 			_pinch_lock_timer = 0.30
+			_lmb_down = false
+			_lmb_dragging = false
 			var ks: Array = _touches.keys()
 			var p0: Vector2 = _touches[ks[0]]
 			var p1: Vector2 = _touches[ks[1]]
@@ -931,6 +939,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		if _mmb_dragging:
 			_pan_screen_delta(me.relative)
 			return
+		if _lmb_down and _pinch_lock_timer <= 0.0:
+			if not _lmb_dragging and me.position.distance_to(_lmb_down_pos) > 10.0:
+				_lmb_dragging = true
+			if _lmb_dragging:
+				_pan_screen_delta(me.relative)
+				return
 		var cell: Vector2i = _raycast_mouse_to_cell(me.position)
 		if cell != _hover_cell:
 			_hover_cell = cell
@@ -942,24 +956,33 @@ func _unhandled_input(event: InputEvent) -> void:
 		if mb.button_index == MOUSE_BUTTON_MIDDLE:
 			_mmb_dragging = mb.pressed
 			return
-		if not mb.pressed:
-			return
-		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+		if mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
 			zoom_by(0.88)
 			return
-		if mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+		if mb.button_index == MOUSE_BUTTON_WHEEL_DOWN and mb.pressed:
 			zoom_by(1.14)
 			return
-		if _pinch_lock_timer > 0.0:
-			return
-		var cell: Vector2i = _raycast_mouse_to_cell(mb.position)
-		if not _cells.has(cell):
-			clear_inspection()
-			return
 		if mb.button_index == MOUSE_BUTTON_LEFT:
-			_handle_left_click(cell)
-		elif mb.button_index == MOUSE_BUTTON_RIGHT:
-			_handle_right_click(cell)
+			if mb.pressed:
+				_lmb_down = true
+				_lmb_down_pos = mb.position
+				_lmb_dragging = false
+			else:
+				var was_drag: bool = _lmb_dragging
+				var was_down: bool = _lmb_down
+				_lmb_down = false
+				_lmb_dragging = false
+				if was_down and not was_drag and _pinch_lock_timer <= 0.0:
+					var cell_l: Vector2i = _raycast_mouse_to_cell(mb.position)
+					if not _cells.has(cell_l):
+						clear_inspection()
+						clear_build_preview()
+					else:
+						_handle_left_click(cell_l)
+			return
+		if mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed and _pinch_lock_timer <= 0.0:
+			var cell_r: Vector2i = _raycast_mouse_to_cell(mb.position)
+			_handle_right_click(cell_r)
 
 
 func _pan_screen_delta(delta_px: Vector2) -> void:

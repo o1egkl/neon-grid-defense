@@ -51,6 +51,7 @@ func _ready() -> void:
 	ui.speed_cycle_requested.connect(_on_cycle_speed)
 	ui.zoom_in_requested.connect(func(): grid_manager.zoom_by(0.84))
 	ui.zoom_out_requested.connect(func(): grid_manager.zoom_by(1.18))
+	ui.reset_camera_requested.connect(func(): grid_manager.reset_camera())
 	ui.tower_selected.connect(_select_tower)
 	ui.upgrade_inspected_requested.connect(_on_upgrade_inspected)
 	ui.sell_inspected_requested.connect(_on_sell_inspected)

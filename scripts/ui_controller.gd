@@ -13,6 +13,7 @@ signal start_wave_requested()
 signal speed_cycle_requested()
 signal zoom_in_requested()
 signal zoom_out_requested()
+signal reset_camera_requested()
 signal level_selected(level_id: int)
 signal prev_level_requested()
 signal next_level_requested()
@@ -48,6 +49,7 @@ var _pill_wave: PanelContainer
 var _lbl_wave: Label
 var _hud_btn_zoom_out: Button
 var _hud_btn_zoom_in: Button
+var _hud_btn_reset_cam: Button
 var _status_toast: PanelContainer
 var _hud_status_label: Label
 var _hud_btn_prev: Button
@@ -449,6 +451,13 @@ func _build_hud() -> void:
 	_style_button(_hud_btn_zoom_in, Color("#00E5FF"))
 	_hud_btn_zoom_in.pressed.connect(func(): zoom_in_requested.emit())
 	hbox.add_child(_hud_btn_zoom_in)
+
+	_hud_btn_reset_cam = Button.new()
+	_hud_btn_reset_cam.text = "1:1"
+	_hud_btn_reset_cam.custom_minimum_size = Vector2(36, 32)
+	_style_button(_hud_btn_reset_cam, Color("#00E5FF"))
+	_hud_btn_reset_cam.pressed.connect(func(): reset_camera_requested.emit())
+	hbox.add_child(_hud_btn_reset_cam)
 
 	_hud_btn_levels = Button.new()
 	_style_button(_hud_btn_levels, Color("#3B82F6"))
