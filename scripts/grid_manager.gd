@@ -2002,16 +2002,19 @@ func _process_towers(dt: float) -> void:
 		var rng: float = float(t.get("range", 180.0)) * PX_TO_WORLD
 		var target_idx: int = _find_target_index(t_pos, rng)
 
+		var aimed: bool = true
 		if target_idx >= 0 and is_instance_valid(head) and tid != "cryo" and tid != "tesla":
 			var ep: Vector3 = _enemies[target_idx]["pos"]
 			var desired_yaw: float = atan2(ep.x - t_pos.x, ep.z - t_pos.z)
 			var cur_yaw: float = float(t["yaw"])
-			var new_yaw: float = lerp_angle(cur_yaw, desired_yaw, minf(1.0, dt * 11.0))
+			var new_yaw: float = lerp_angle(cur_yaw, desired_yaw, minf(1.0, dt * 14.0))
 			t["yaw"] = new_yaw
 			head.rotation.y = new_yaw
+			if absf(angle_difference(new_yaw, desired_yaw)) > 0.14:
+				aimed = false
 
 		t["cooldown"] = maxf(0.0, float(t["cooldown"]) - dt)
-		if float(t["cooldown"]) > 0.0 or target_idx < 0:
+		if float(t["cooldown"]) > 0.0 or target_idx < 0 or not aimed:
 			continue
 
 		var fire_rate: float = maxf(0.1, float(t.get("fire_rate", 1.0)))
