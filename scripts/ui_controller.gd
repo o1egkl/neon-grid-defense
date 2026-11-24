@@ -48,6 +48,7 @@ var _pill_wave: PanelContainer
 var _lbl_wave: Label
 var _hud_btn_zoom_out: Button
 var _hud_btn_zoom_in: Button
+var _status_toast: PanelContainer
 var _hud_status_label: Label
 var _hud_btn_prev: Button
 var _hud_btn_next: Button
@@ -151,6 +152,8 @@ func _ready() -> void:
 	_build_overlays()
 	SettingsManager.language_changed.connect(_on_language_changed)
 	SettingsManager.difficulty_changed.connect(func(_d: String): _sync_difficulty_ui())
+	get_viewport().size_changed.connect(_on_viewport_resized)
+	call_deferred("_on_viewport_resized")
 	_apply_translations()
 	show_settings()
 
@@ -352,15 +355,19 @@ func _style_button(btn: Button, accent := Color("#00E5FF"), filled := false, dim
 func _build_hud() -> void:
 	_hud_bar = PanelContainer.new()
 	_hud_bar.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_hud_bar.offset_bottom = 48.0
+	_hud_bar.offset_bottom = 0.0
 	var bar_style := _make_panel_style(Color("#0D1321"), Color("#1E293B"), 0, 1)
 	bar_style.content_margin_top = 6
 	bar_style.content_margin_bottom = 6
+	bar_style.content_margin_left = 8
+	bar_style.content_margin_right = 8
 	_hud_bar.add_theme_stylebox_override("panel", bar_style)
 	add_child(_hud_bar)
 
-	var hbox := HBoxContainer.new()
-	hbox.add_theme_constant_override("separation", 8)
+	var hbox := HFlowContainer.new()
+	hbox.alignment = FlowContainer.ALIGNMENT_CENTER
+	hbox.add_theme_constant_override("h_separation", 6)
+	hbox.add_theme_constant_override("v_separation", 6)
 	_hud_bar.add_child(hbox)
 
 	_hud_btn_prev = Button.new()
@@ -397,14 +404,24 @@ func _build_hud() -> void:
 	_pill_wave = p_wv[0]
 	_lbl_wave = p_wv[1]
 
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hbox.add_child(spacer)
+	_status_toast = PanelContainer.new()
+	_status_toast.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_status_toast.offset_left = -260.0
+	_status_toast.offset_right = 260.0
+	_status_toast.offset_top = 52.0
+	_status_toast.offset_bottom = 78.0
+	_status_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var toast_sb := _make_panel_style(Color(0.05, 0.08, 0.14, 0.78), Color("#1E293B"), 10, 1)
+	toast_sb.content_margin_top = 2
+	toast_sb.content_margin_bottom = 2
+	_status_toast.add_theme_stylebox_override("panel", toast_sb)
+	add_child(_status_toast)
 
 	_hud_status_label = Label.new()
+	_hud_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hud_status_label.add_theme_color_override("font_color", Color("#CBD5E1"))
 	_hud_status_label.add_theme_font_size_override("font_size", 12)
-	hbox.add_child(_hud_status_label)
+	_status_toast.add_child(_hud_status_label)
 
 	_hud_btn_wave = Button.new()
 	_hud_btn_wave.custom_minimum_size = Vector2(126, 32)
@@ -469,10 +486,17 @@ func _build_tower_shop() -> void:
 	_shop_title_label.add_theme_color_override("font_color", Color("#94A3B8"))
 	vbox.add_child(_shop_title_label)
 
+	var shop_scroll := ScrollContainer.new()
+	shop_scroll.custom_minimum_size = Vector2(0, 92)
+	shop_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	shop_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vbox.add_child(shop_scroll)
+
 	_shop_cards_box = HBoxContainer.new()
+	_shop_cards_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_shop_cards_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	_shop_cards_box.add_theme_constant_override("separation", 8)
-	vbox.add_child(_shop_cards_box)
+	shop_scroll.add_child(_shop_cards_box)
 
 
 func _rebuild_tower_shop_cards() -> void:
@@ -726,9 +750,19 @@ func _build_settings_panel(parent: Control) -> void:
 	_settings_panel.add_theme_stylebox_override("panel", _make_panel_style(Color("#0F172A"), Color("#00E5FF"), 12, 2))
 	parent.add_child(_settings_panel)
 
+	var outer_v := VBoxContainer.new()
+	outer_v.add_theme_constant_override("separation", 8)
+	_settings_panel.add_child(outer_v)
+
+	var s_scroll := ScrollContainer.new()
+	s_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	s_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	outer_v.add_child(s_scroll)
+
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 9)
-	_settings_panel.add_child(vbox)
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.add_theme_constant_override("separation", 8)
+	s_scroll.add_child(vbox)
 
 	_lbl_game_title = Label.new()
 	_lbl_game_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -754,9 +788,10 @@ func _build_settings_panel(parent: Control) -> void:
 	vbox.add_child(_lbl_lang)
 
 	# Все 7 языков в одну ровную строку
-	var lang_row := HBoxContainer.new()
-	lang_row.add_theme_constant_override("separation", 6)
-	lang_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	var lang_row := HFlowContainer.new()
+	lang_row.add_theme_constant_override("h_separation", 6)
+	lang_row.add_theme_constant_override("v_separation", 6)
+	lang_row.alignment = FlowContainer.ALIGNMENT_CENTER
 	vbox.add_child(lang_row)
 
 	for lang in SettingsManager.languages:
@@ -773,9 +808,10 @@ func _build_settings_panel(parent: Control) -> void:
 	_lbl_diff_title.add_theme_color_override("font_color", Color("#CBD5E1"))
 	vbox.add_child(_lbl_diff_title)
 
-	var diff_row := HBoxContainer.new()
-	diff_row.add_theme_constant_override("separation", 10)
-	diff_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	var diff_row := HFlowContainer.new()
+	diff_row.add_theme_constant_override("h_separation", 8)
+	diff_row.add_theme_constant_override("v_separation", 6)
+	diff_row.alignment = FlowContainer.ALIGNMENT_CENTER
 	vbox.add_child(diff_row)
 
 	for d_cfg in [["easy", "#10B981"], ["hard", "#F59E0B"], ["nightmare", "#EF4444"]]:
@@ -823,8 +859,10 @@ func _build_settings_panel(parent: Control) -> void:
 		_val_music.text = "%d%%" % int(v)
 	)
 
-	var toggles := HBoxContainer.new()
-	toggles.add_theme_constant_override("separation", 20)
+	var toggles := HFlowContainer.new()
+	toggles.add_theme_constant_override("h_separation", 16)
+	toggles.add_theme_constant_override("v_separation", 6)
+	toggles.alignment = FlowContainer.ALIGNMENT_CENTER
 	vbox.add_child(toggles)
 
 	_chk_mute = CheckBox.new()
@@ -863,10 +901,11 @@ func _build_settings_panel(parent: Control) -> void:
 	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(sp)
 
-	var actions := HBoxContainer.new()
-	actions.add_theme_constant_override("separation", 12)
-	actions.alignment = BoxContainer.ALIGNMENT_CENTER
-	vbox.add_child(actions)
+	var actions := HFlowContainer.new()
+	actions.add_theme_constant_override("h_separation", 10)
+	actions.add_theme_constant_override("v_separation", 8)
+	actions.alignment = FlowContainer.ALIGNMENT_CENTER
+	outer_v.add_child(actions)
 
 	_btn_open_guide = Button.new()
 	_btn_open_guide.custom_minimum_size = Vector2(180, 44)
@@ -1025,9 +1064,10 @@ func _build_levels_panel(parent: Control) -> void:
 	_lbl_levels_title.add_theme_color_override("font_color", Color("#3B82F6"))
 	v.add_child(_lbl_levels_title)
 
-	var l_diff_row := HBoxContainer.new()
-	l_diff_row.add_theme_constant_override("separation", 10)
-	l_diff_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	var l_diff_row := HFlowContainer.new()
+	l_diff_row.add_theme_constant_override("h_separation", 8)
+	l_diff_row.add_theme_constant_override("v_separation", 6)
+	l_diff_row.alignment = FlowContainer.ALIGNMENT_CENTER
 	v.add_child(l_diff_row)
 
 	for d_cfg in [["easy", "#10B981"], ["hard", "#F59E0B"], ["nightmare", "#EF4444"]]:
@@ -1171,7 +1211,8 @@ func _apply_translations() -> void:
 	_btn_open_levels.text = SettingsManager.tr_key("btn_levels")
 
 	_hud_btn_levels.text = SettingsManager.tr_key("btn_levels")
-	_hud_btn_guide.text = "? " + SettingsManager.tr_key("btn_how_to_play")
+	var vp_w: float = get_viewport().get_visible_rect().size.x
+	_hud_btn_guide.text = "?" if vp_w < 1260.0 else ("? " + SettingsManager.tr_key("btn_how_to_play"))
 	_hud_btn_settings.text = SettingsManager.tr_key("btn_settings")
 	_shop_title_label.text = SettingsManager.tr_key("shop_title")
 	set_wave_button_active(_wave_active)
@@ -1226,3 +1267,33 @@ func _sync_difficulty_ui() -> void:
 	if _lbl_levels_diff_desc:
 		_lbl_levels_diff_desc.text = desc_txt
 		_lbl_levels_diff_desc.add_theme_color_override("font_color", d_col.lightened(0.25))
+
+
+func _on_viewport_resized() -> void:
+	var vp: Vector2 = get_viewport().get_visible_rect().size
+	if vp.x <= 1.0 or vp.y <= 1.0:
+		return
+	var pad: float = 28.0
+	if _settings_panel:
+		_settings_panel.custom_minimum_size = Vector2(minf(780.0, vp.x - pad), minf(600.0, vp.y - pad))
+	if _guide_panel:
+		_guide_panel.custom_minimum_size = Vector2(minf(800.0, vp.x - pad), minf(600.0, vp.y - pad))
+	if _levels_panel:
+		_levels_panel.custom_minimum_size = Vector2(minf(840.0, vp.x - pad), minf(580.0, vp.y - pad))
+	if _levels_grid:
+		_levels_grid.columns = 4 if vp.x >= 780.0 else (3 if vp.x >= 560.0 else 2)
+	if _result_panel:
+		_result_panel.custom_minimum_size = Vector2(minf(460.0, vp.x - pad), minf(220.0, vp.y - pad))
+	var half_w: float = minf(340.0, (vp.x - 24.0) * 0.5)
+	if _inspector_panel:
+		_inspector_panel.offset_left = -half_w
+		_inspector_panel.offset_right = half_w
+	if _preview_panel:
+		_preview_panel.offset_left = -half_w
+		_preview_panel.offset_right = half_w
+	if _hud_bar and _status_toast:
+		var bar_h: float = maxf(_hud_bar.size.y, 46.0)
+		_status_toast.offset_top = bar_h + 6.0
+		_status_toast.offset_bottom = bar_h + 32.0
+	if _hud_btn_guide:
+		_hud_btn_guide.text = "?" if vp.x < 1260.0 else ("? " + SettingsManager.tr_key("btn_how_to_play"))
