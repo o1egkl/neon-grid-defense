@@ -132,6 +132,13 @@ func mark_level_completed(level_id: int) -> void:
 		settings_changed.emit()
 
 
+func reset_progress() -> void:
+	completed_levels.clear()
+	default_speed = 1
+	save_settings()
+	settings_changed.emit()
+
+
 func set_default_speed(val: int) -> void:
 	if not is_fast_speed_unlocked():
 		default_speed = 1

@@ -17,6 +17,7 @@ signal reset_camera_requested()
 signal level_selected(level_id: int)
 signal next_level_requested()
 signal retry_level_requested()
+signal new_game_requested()
 signal tower_selected(tower_id: String)
 signal upgrade_inspected_requested()
 signal sell_inspected_requested()
@@ -84,6 +85,7 @@ var _settings_panel: PanelContainer
 var _guide_panel: PanelContainer
 var _levels_panel: PanelContainer
 var _result_panel: PanelContainer
+var _confirm_reset_panel: PanelContainer
 
 # Settings controls
 var _lbl_game_title: Label
@@ -114,6 +116,7 @@ var _lbl_speed_hint: Label
 var _btn_play: Button
 var _btn_open_guide: Button
 var _btn_open_levels: Button
+var _btn_new_game: Button
 
 # Guide controls
 var _lbl_guide_title: Label
@@ -138,6 +141,12 @@ var _lbl_result_title: Label
 var _lbl_result_body: Label
 var _btn_result_retry: Button
 var _btn_result_next: Button
+
+# New Game confirmation controls
+var _lbl_reset_title: Label
+var _lbl_reset_body: Label
+var _btn_reset_confirm: Button
+var _btn_reset_cancel: Button
 
 
 func _ready() -> void:
@@ -175,6 +184,7 @@ func show_settings() -> void:
 	_guide_panel.visible = false
 	_levels_panel.visible = false
 	_result_panel.visible = false
+	_confirm_reset_panel.visible = false
 	_sync_settings_controls()
 	_apply_translations()
 	overlay_visibility_changed.emit(true)
@@ -186,6 +196,7 @@ func show_guide() -> void:
 	_guide_panel.visible = true
 	_levels_panel.visible = false
 	_result_panel.visible = false
+	_confirm_reset_panel.visible = false
 	_apply_translations()
 	overlay_visibility_changed.emit(true)
 
@@ -196,6 +207,7 @@ func show_levels() -> void:
 	_guide_panel.visible = false
 	_levels_panel.visible = true
 	_result_panel.visible = false
+	_confirm_reset_panel.visible = false
 	_rebuild_level_buttons()
 	_apply_translations()
 	overlay_visibility_changed.emit(true)
@@ -208,6 +220,7 @@ func show_result(is_victory: bool) -> void:
 	_guide_panel.visible = false
 	_levels_panel.visible = false
 	_result_panel.visible = true
+	_confirm_reset_panel.visible = false
 	_btn_result_next.visible = is_victory
 	_apply_translations()
 	overlay_visibility_changed.emit(true)
@@ -220,8 +233,20 @@ func close_overlays() -> void:
 	_guide_panel.visible = false
 	_levels_panel.visible = false
 	_result_panel.visible = false
+	_confirm_reset_panel.visible = false
 	overlay_visibility_changed.emit(false)
 	play_requested.emit()
+
+
+func show_confirm_new_game() -> void:
+	_backdrop.visible = true
+	_settings_panel.visible = false
+	_guide_panel.visible = false
+	_levels_panel.visible = false
+	_result_panel.visible = false
+	_confirm_reset_panel.visible = true
+	_apply_translations()
+	overlay_visibility_changed.emit(true)
 
 
 func set_wave_button_active(active: bool) -> void:
@@ -739,6 +764,7 @@ func _build_overlays() -> void:
 	_build_guide_panel(center)
 	_build_levels_panel(center)
 	_build_result_panel(center)
+	_build_confirm_reset_panel(center)
 
 
 func _build_settings_panel(parent: Control) -> void:
@@ -921,8 +947,14 @@ func _build_settings_panel(parent: Control) -> void:
 	_btn_open_levels.pressed.connect(show_levels)
 	actions.add_child(_btn_open_levels)
 
+	_btn_new_game = Button.new()
+	_btn_new_game.custom_minimum_size = Vector2(150, 44)
+	_style_button(_btn_new_game, Color("#EF4444"))
+	_btn_new_game.pressed.connect(show_confirm_new_game)
+	actions.add_child(_btn_new_game)
+
 	_btn_play = Button.new()
-	_btn_play.custom_minimum_size = Vector2(200, 44)
+	_btn_play.custom_minimum_size = Vector2(180, 44)
 	_style_button(_btn_play, Color("#00E5FF"), true)
 	_btn_play.pressed.connect(close_overlays)
 	actions.add_child(_btn_play)
@@ -1156,6 +1188,51 @@ func _build_result_panel(parent: Control) -> void:
 	btns.add_child(_btn_result_next)
 
 
+func _build_confirm_reset_panel(parent: Control) -> void:
+	_confirm_reset_panel = PanelContainer.new()
+	_confirm_reset_panel.custom_minimum_size = Vector2(480, 240)
+	_confirm_reset_panel.add_theme_stylebox_override("panel", _make_panel_style(Color("#0F172A"), Color("#EF4444"), 12, 2))
+	parent.add_child(_confirm_reset_panel)
+
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 14)
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	_confirm_reset_panel.add_child(v)
+
+	_lbl_reset_title = Label.new()
+	_lbl_reset_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lbl_reset_title.add_theme_font_size_override("font_size", 24)
+	_lbl_reset_title.add_theme_color_override("font_color", Color("#EF4444"))
+	v.add_child(_lbl_reset_title)
+
+	_lbl_reset_body = Label.new()
+	_lbl_reset_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lbl_reset_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_lbl_reset_body.add_theme_color_override("font_color", Color("#E2E8F0"))
+	v.add_child(_lbl_reset_body)
+
+	var btns := HFlowContainer.new()
+	btns.alignment = FlowContainer.ALIGNMENT_CENTER
+	btns.add_theme_constant_override("h_separation", 14)
+	btns.add_theme_constant_override("v_separation", 8)
+	v.add_child(btns)
+
+	_btn_reset_cancel = Button.new()
+	_btn_reset_cancel.custom_minimum_size = Vector2(150, 42)
+	_style_button(_btn_reset_cancel, Color("#94A3B8"))
+	_btn_reset_cancel.pressed.connect(show_settings)
+	btns.add_child(_btn_reset_cancel)
+
+	_btn_reset_confirm = Button.new()
+	_btn_reset_confirm.custom_minimum_size = Vector2(180, 42)
+	_style_button(_btn_reset_confirm, Color("#EF4444"), true)
+	_btn_reset_confirm.pressed.connect(func():
+		close_overlays()
+		new_game_requested.emit()
+	)
+	btns.add_child(_btn_reset_confirm)
+
+
 func _rebuild_level_buttons() -> void:
 	for c in _levels_grid.get_children():
 		c.queue_free()
@@ -1226,6 +1303,11 @@ func _apply_translations() -> void:
 	_btn_play.text = SettingsManager.tr_key("btn_resume") if _has_started else SettingsManager.tr_key("btn_play")
 	_btn_open_guide.text = SettingsManager.tr_key("btn_how_to_play")
 	_btn_open_levels.text = SettingsManager.tr_key("btn_levels")
+	_btn_new_game.text = SettingsManager.tr_key("btn_new_game")
+	_lbl_reset_title.text = SettingsManager.tr_key("confirm_new_game_title")
+	_lbl_reset_body.text = SettingsManager.tr_key("confirm_new_game_body")
+	_btn_reset_confirm.text = SettingsManager.tr_key("btn_confirm_reset")
+	_btn_reset_cancel.text = SettingsManager.tr_key("btn_cancel")
 
 	var vp_w: float = get_viewport().get_visible_rect().size.x
 	_hud_btn_guide.text = "?" if vp_w < 1260.0 else ("? " + SettingsManager.tr_key("btn_how_to_play"))
@@ -1301,6 +1383,8 @@ func _on_viewport_resized() -> void:
 		_levels_grid.columns = 4 if vp.x >= 780.0 else (3 if vp.x >= 560.0 else 2)
 	if _result_panel:
 		_result_panel.custom_minimum_size = Vector2(minf(460.0, vp.x - pad), minf(220.0, vp.y - pad))
+	if _confirm_reset_panel:
+		_confirm_reset_panel.custom_minimum_size = Vector2(minf(480.0, vp.x - pad), minf(240.0, vp.y - pad))
 	var half_w: float = minf(340.0, (vp.x - 24.0) * 0.5)
 	if _inspector_panel:
 		_inspector_panel.offset_left = -half_w

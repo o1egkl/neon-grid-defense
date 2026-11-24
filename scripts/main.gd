@@ -52,6 +52,7 @@ func _ready() -> void:
 			_load_level(current_level_index + 1)
 	)
 	ui.retry_level_requested.connect(func(): _load_level(current_level_index))
+	ui.new_game_requested.connect(_on_new_game_requested)
 	ui.start_wave_requested.connect(_on_start_wave)
 	ui.speed_cycle_requested.connect(_on_cycle_speed)
 	ui.zoom_in_requested.connect(func(): grid_manager.zoom_by(0.84))
@@ -245,6 +246,14 @@ func _on_wave_state_changed(wave_num: int, t_waves: int, active: bool) -> void:
 	total_waves = t_waves
 	ui.set_wave_button_active(active)
 	_refresh_hud()
+
+
+func _on_new_game_requested() -> void:
+	SettingsManager.reset_progress()
+	current_speed = 1
+	grid_manager.game_speed = 1.0
+	ui.set_speed_display(1)
+	_load_level(1)
 
 
 func _on_difficulty_changed(_diff_id: String) -> void:

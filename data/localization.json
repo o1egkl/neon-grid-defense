@@ -114,7 +114,11 @@
       "diff_desc_nightmare": "Enemy HP x1.75  |  Speed x1.18  |  Cores: 5  |  Start Credits: 85%",
       "msg_speed_locked": "Complete all 20 levels to unlock 2x/3x speed!",
       "speed_locked_hint": "2x/3x unlocks after all 20 levels (%d/20)",
-      "lbl_locked": "LOCKED"
+      "lbl_locked": "LOCKED",
+      "btn_new_game": "NEW GAME",
+      "confirm_new_game_title": "START NEW GAME?",
+      "confirm_new_game_body": "All previous progress (completed levels and unlocked 2x/3x speed) will be permanently reset. Start from scratch?",
+      "btn_confirm_reset": "RESET & START"
     },
     "es": {
       "game_title": "NEON GRID DEFENSE",
@@ -200,7 +204,11 @@
       "diff_desc_nightmare": "HP x1.75  |  Velocidad x1.18  |  Núcleos: 5  |  Créditos: 85%",
       "msg_speed_locked": "¡Completa los 20 niveles para desbloquear 2x/3x!",
       "speed_locked_hint": "2x/3x se desbloquea tras los 20 niveles (%d/20)",
-      "lbl_locked": "BLOQUEADO"
+      "lbl_locked": "BLOQUEADO",
+      "btn_new_game": "NUEVA PARTIDA",
+      "confirm_new_game_title": "¿EMPEZAR NUEVA PARTIDA?",
+      "confirm_new_game_body": "Todo el progreso anterior (niveles completados y velocidad 2x/3x) se borrará por completo. ¿Empezar desde cero?",
+      "btn_confirm_reset": "REINICIAR"
     },
     "ru": {
       "game_title": "NEON GRID DEFENSE",
@@ -286,7 +294,11 @@
       "diff_desc_nightmare": "HP врагов x1.75  |  Скорость x1.18  |  Ядра: 5  |  Старт: 85%",
       "msg_speed_locked": "Пройдите все 20 уровней, чтобы открыть скорость 2x/3x!",
       "speed_locked_hint": "2x/3x откроется после всех 20 уровней (%d/20)",
-      "lbl_locked": "ЗАКРЫТО"
+      "lbl_locked": "ЗАКРЫТО",
+      "btn_new_game": "НОВАЯ ИГРА",
+      "confirm_new_game_title": "НАЧАТЬ НОВУЮ ИГРУ?",
+      "confirm_new_game_body": "Весь предыдущий прогресс (пройденные уровни и открытая скорость 2x/3x) будет полностью обнулён. Начать игру с нуля?",
+      "btn_confirm_reset": "СБРОСИТЬ И НАЧАТЬ"
     },
     "pt": {
       "game_title": "NEON GRID DEFENSE",
@@ -372,7 +384,11 @@
       "diff_desc_nightmare": "HP x1.75  |  Velocidade x1.18  |  Núcleos: 5  |  Créditos: 85%",
       "msg_speed_locked": "Complete todos os 20 níveis para liberar 2x/3x!",
       "speed_locked_hint": "2x/3x libera após os 20 níveis (%d/20)",
-      "lbl_locked": "BLOQUEADO"
+      "lbl_locked": "BLOQUEADO",
+      "btn_new_game": "NOVO JOGO",
+      "confirm_new_game_title": "INICIAR NOVO JOGO?",
+      "confirm_new_game_body": "Todo o progresso anterior (níveis concluídos e velocidade 2x/3x) será apagado. Começar do zero?",
+      "btn_confirm_reset": "REINICIAR"
     },
     "fr": {
       "game_title": "NEON GRID DEFENSE",
@@ -458,7 +474,11 @@
       "diff_desc_nightmare": "PV x1.75  |  Vitesse x1.18  |  Coeurs: 5  |  Crédits: 85%",
       "msg_speed_locked": "Terminez les 20 niveaux pour débloquer 2x/3x !",
       "speed_locked_hint": "2x/3x débloqué après les 20 niveaux (%d/20)",
-      "lbl_locked": "VERROUILLÉ"
+      "lbl_locked": "VERROUILLÉ",
+      "btn_new_game": "NOUVELLE PARTIE",
+      "confirm_new_game_title": "NOUVELLE PARTIE ?",
+      "confirm_new_game_body": "Toute la progression précédente (niveaux terminés et vitesse 2x/3x) sera définitivement effacée. Recommencer à zéro ?",
+      "btn_confirm_reset": "RÉINITIALISER"
     },
     "de": {
       "game_title": "NEON GRID DEFENSE",
@@ -544,7 +564,11 @@
       "diff_desc_nightmare": "HP x1.75  |  Tempo x1.18  |  Kerne: 5  |  Credits: 85%",
       "msg_speed_locked": "Schließe alle 20 Level ab, um 2x/3x freizuschalten!",
       "speed_locked_hint": "2x/3x wird nach allen 20 Leveln frei (%d/20)",
-      "lbl_locked": "GESPERRT"
+      "lbl_locked": "GESPERRT",
+      "btn_new_game": "NEUES SPIEL",
+      "confirm_new_game_title": "NEUES SPIEL STARTEN?",
+      "confirm_new_game_body": "Der gesamte bisherige Fortschritt (abgeschlossene Level und 2x/3x-Tempo) wird zurückgesetzt. Von vorne beginnen?",
+      "btn_confirm_reset": "ZURÜCKSETZEN"
     },
     "it": {
       "game_title": "NEON GRID DEFENSE",
@@ -630,7 +654,11 @@
       "diff_desc_nightmare": "HP x1.75  |  Velocità x1.18  |  Nuclei: 5  |  Crediti: 85%",
       "msg_speed_locked": "Completa tutti i 20 livelli per sbloccare 2x/3x!",
       "speed_locked_hint": "2x/3x si sblocca dopo i 20 livelli (%d/20)",
-      "lbl_locked": "BLOCCATO"
+      "lbl_locked": "BLOCCATO",
+      "btn_new_game": "NUOVA PARTITA",
+      "confirm_new_game_title": "INIZIARE NUOVA PARTITA?",
+      "confirm_new_game_body": "Tutti i progressi precedenti (livelli completati e velocità 2x/3x) verranno azzerati. Ricominciare da zero?",
+      "btn_confirm_reset": "AZZERA E INIZIA"
     }
   }
 }
