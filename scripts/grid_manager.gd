@@ -66,6 +66,7 @@ var _core_ring_a: MeshInstance3D
 var _core_ring_b: MeshInstance3D
 var _core_light: OmniLight3D
 var _core_mat: StandardMaterial3D
+var _outline_mat: StandardMaterial3D
 
 # Combat runtime
 var _waves_data: Array = []
@@ -83,7 +84,7 @@ var _round_robin_spawn: int = 0
 var _anim_time: float = 0.0
 
 # Camera Zoom & Pan (Desktop Wheel + MMB/WASD + Android 2-Finger Pinch)
-var _base_cam_size: float = 22.8
+var _base_cam_size: float = 20.4
 var _zoom_factor: float = 1.0
 var _target_zoom: float = 1.0
 var _pan_offset := Vector3.ZERO
@@ -114,16 +115,24 @@ func _load_enemy_catalog() -> void:
 
 
 func _setup_environment_and_camera() -> void:
+	_outline_mat = StandardMaterial3D.new()
+	_outline_mat.albedo_color = Color("#04070E")
+	_outline_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_outline_mat.cull_mode = BaseMaterial3D.CULL_FRONT
+	_outline_mat.grow = true
+	_outline_mat.grow_amount = 0.026
+
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color("#050810")
+	env.background_color = Color("#060A12")
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color("#243B5C")
-	env.ambient_light_energy = 0.65
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.ambient_light_color = Color("#2B405E")
+	env.ambient_light_energy = 0.72
+	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
 	env.glow_enabled = true
-	env.glow_intensity = 0.90
-	env.glow_bloom = 0.28
+	env.glow_intensity = 0.55
+	env.glow_bloom = 0.05
+	env.glow_hdr_threshold = 1.25
 	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
 
 	var we := WorldEnvironment.new()
@@ -201,9 +210,9 @@ func _update_camera_fit() -> void:
 		return
 	var vp: Vector2 = get_viewport().get_visible_rect().size
 	var aspect: float = maxf(vp.x / maxf(vp.y, 1.0), 0.5)
-	_base_cam_size = 22.8
+	_base_cam_size = 20.4
 	if aspect < 1.65:
-		_base_cam_size = 22.8 * (1.65 / aspect)
+		_base_cam_size = 20.4 * (1.65 / aspect)
 	_apply_camera_transform()
 
 
@@ -333,7 +342,7 @@ func _apply_tower_upgrade_visuals(cell: Vector2i, t: Dictionary) -> void:
 	var ring_col: Color = Color("#FACC15") if lvl == MAX_TOWER_LEVEL else col
 
 	if is_instance_valid(head):
-		var sc: float = 1.0 + float(lvl - 1) * 0.045
+		var sc: float = 1.22 + float(lvl - 1) * 0.055
 		head.scale = Vector3(sc, sc, sc)
 
 	if is_instance_valid(rank_group):
@@ -390,6 +399,13 @@ func _make_mat(col: Color, emission_strength: float = 0.0, alpha: float = 1.0, m
 		m.emission_enabled = true
 		m.emission = col
 		m.emission_energy_multiplier = emission_strength
+	return m
+
+
+func _make_unit_mat(col: Color, emission_strength: float = 0.0) -> StandardMaterial3D:
+	var m := _make_mat(col, emission_strength, 1.0, 0.18, 0.56)
+	if _outline_mat:
+		m.next_pass = _outline_mat
 	return m
 
 
@@ -550,8 +566,8 @@ func _build_3d_board() -> void:
 	# Неоновая рамка по периметру всей 3D-доски (как на концепте)
 	var gx: float = float(grid_size.x)
 	var gz: float = float(grid_size.y)
-	var rim_cyan := _make_mat(Color("#00E5FF"), 2.4, 0.9, 0.1, 0.2)
-	var rim_viol := _make_mat(Color("#A855F7"), 2.2, 0.9, 0.1, 0.2)
+	var rim_cyan := _make_mat(Color("#00E5FF"), 1.45, 0.85, 0.1, 0.2)
+	var rim_viol := _make_mat(Color("#A855F7"), 1.35, 0.85, 0.1, 0.2)
 	_board_root.add_child(_create_beam_mesh(Vector3(-0.25, -0.02, -0.25), Vector3(gx + 0.25, -0.02, -0.25), 0.09, rim_cyan))
 	_board_root.add_child(_create_beam_mesh(Vector3(-0.25, -0.02, gz + 0.25), Vector3(gx + 0.25, -0.02, gz + 0.25), 0.09, rim_viol))
 	_board_root.add_child(_create_beam_mesh(Vector3(-0.25, -0.02, -0.25), Vector3(-0.25, -0.02, gz + 0.25), 0.09, rim_cyan))
@@ -695,10 +711,10 @@ func _build_energy_core(pos: Vector3) -> void:
 
 func _build_3d_routes() -> void:
 	_clear_node_children(_route_root)
-	var line_mat := _make_mat(Color("#00E5FF"), 3.0, 0.95, 0.1, 0.15)
+	var line_mat := _make_mat(Color("#00D8F5"), 1.35, 0.90, 0.1, 0.25)
 	var joint_mesh := SphereMesh.new()
-	joint_mesh.radius = 0.052
-	joint_mesh.height = 0.104
+	joint_mesh.radius = 0.042
+	joint_mesh.height = 0.084
 
 	for spath in smooth_paths:
 		var pts: PackedVector3Array = spath
@@ -707,7 +723,7 @@ func _build_3d_routes() -> void:
 			var b: Vector3 = pts[i + 1] + Vector3(0.0, -0.02, 0.0)
 			if a.distance_to(b) < 0.01:
 				continue
-			var seg := _create_beam_mesh(a, b, 0.15, line_mat)
+			var seg := _create_beam_mesh(a, b, 0.075, line_mat)
 			_route_root.add_child(seg)
 			var cap := MeshInstance3D.new()
 			cap.mesh = joint_mesh
@@ -984,10 +1000,10 @@ func commit_remove_tower(cell: Vector2i) -> void:
 
 func _build_rotating_tower(tid: String, col: Color, on_boost: bool) -> Dictionary:
 	var root := Node3D.new()
-	var dark_mat := _make_mat(Color("#152033"), 0.0, 1.0, 0.72, 0.35)
-	var steel_mat := _make_mat(Color("#475569"), 0.0, 1.0, 0.80, 0.28)
-	var accent_mat := _make_mat(col, 0.35, 1.0, 0.62, 0.28)
-	var glow_mat := _make_mat(col, 2.8, 1.0, 0.15, 0.15)
+	var dark_mat := _make_unit_mat(Color("#18253A"), 0.0)
+	var steel_mat := _make_unit_mat(Color("#64748B"), 0.0)
+	var accent_mat := _make_unit_mat(col.lightened(0.08), 0.18)
+	var glow_mat := _make_mat(col.lightened(0.15), 2.1, 1.0, 0.1, 0.2)
 
 	var ped := MeshInstance3D.new()
 	var pm := CylinderMesh.new()
@@ -1036,6 +1052,7 @@ func _build_rotating_tower(tid: String, col: Color, on_boost: bool) -> Dictionar
 
 	var head := Node3D.new()
 	head.position.y = 0.36
+	head.scale = Vector3(1.22, 1.22, 1.22)
 	root.add_child(head)
 
 	var barrel_group := Node3D.new()
@@ -1357,12 +1374,29 @@ func _build_animated_enemy(eid: String, elite: bool, has_shield: bool) -> Dictio
 	var root := Node3D.new()
 	var body_pivot := Node3D.new()
 	root.add_child(body_pivot)
-	var sc: float = 1.25 if elite else 1.0
+	var sc: float = 1.75 if elite else 1.45
 	body_pivot.scale = Vector3(sc, sc, sc)
 
+	# Тёмная контактная тень под каждым врагом — чётко отделяет силуэт от неоновой дороги
+	if eid != "drone":
+		var shadow := MeshInstance3D.new()
+		var shm := CylinderMesh.new()
+		shm.top_radius = 0.36 * sc
+		shm.bottom_radius = 0.36 * sc
+		shm.height = 0.02
+		shm.radial_segments = 16
+		shadow.mesh = shm
+		shadow.position.y = 0.02
+		var shmat := StandardMaterial3D.new()
+		shmat.albedo_color = Color(0.01, 0.02, 0.05, 0.80)
+		shmat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		shmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		shadow.material_override = shmat
+		root.add_child(shadow)
+
 	var parts: Dictionary = {"pivot": body_pivot}
-	var steel := _make_mat(Color("#475569"), 0.0, 1.0, 0.78, 0.30)
-	var dark := _make_mat(Color("#1E293B"), 0.0, 1.0, 0.65, 0.45)
+	var steel := _make_unit_mat(Color("#94A3B8"), 0.0)
+	var dark := _make_unit_mat(Color("#273549"), 0.0)
 
 	match eid:
 		"swarm":
@@ -1371,7 +1405,7 @@ func _build_animated_enemy(eid: String, elite: bool, has_shield: bool) -> Dictio
 			bm.size = Vector3(0.28, 0.14, 0.38)
 			hull.mesh = bm
 			hull.position.y = 0.22
-			hull.material_override = _make_mat(Color("#BE123C"), 0.3, 1.0, 0.6, 0.3)
+			hull.material_override = _make_unit_mat(Color("#E11D48"), 0.15)
 			body_pivot.add_child(hull)
 			var thrust := MeshInstance3D.new()
 			var sm := SphereMesh.new()
@@ -1384,7 +1418,7 @@ func _build_animated_enemy(eid: String, elite: bool, has_shield: bool) -> Dictio
 			parts["thruster"] = thrust
 
 		"trooper":
-			var red := _make_mat(Color("#DC2626"), 0.25, 1.0, 0.55, 0.32)
+			var red := _make_unit_mat(Color("#EF4444"), 0.15)
 			var visor := _make_mat(Color("#F97316"), 2.8, 1.0, 0.1, 0.1)
 			var leg_l := _make_leg(steel, Vector3(-0.10, 0.24, 0.0), 0.24)
 			var leg_r := _make_leg(steel, Vector3(0.10, 0.24, 0.0), 0.24)
@@ -1462,7 +1496,7 @@ func _build_animated_enemy(eid: String, elite: bool, has_shield: bool) -> Dictio
 			parts["turret"] = turret
 
 		"shielded":
-			var purp := _make_mat(Color("#7E22CE"), 0.3, 1.0, 0.6, 0.3)
+			var purp := _make_unit_mat(Color("#A855F7"), 0.18)
 			var leg_l := _make_leg(dark, Vector3(-0.13, 0.26, 0.0), 0.26)
 			var leg_r := _make_leg(dark, Vector3(0.13, 0.26, 0.0), 0.26)
 			body_pivot.add_child(leg_l)
@@ -1509,7 +1543,7 @@ func _build_animated_enemy(eid: String, elite: bool, has_shield: bool) -> Dictio
 			parts["beacon"] = beacon
 
 		"splitter":
-			var gold_mat := _make_mat(Color("#D97706"), 0.35, 1.0, 0.7, 0.28)
+			var gold_mat := _make_unit_mat(Color("#F59E0B"), 0.18)
 			var core_m := MeshInstance3D.new()
 			var cm := BoxMesh.new()
 			cm.size = Vector3(0.24, 0.24, 0.24)
@@ -1532,7 +1566,7 @@ func _build_animated_enemy(eid: String, elite: bool, has_shield: bool) -> Dictio
 			var hm := BoxMesh.new()
 			hm.size = Vector3(0.26, 0.12, 0.36)
 			hull.mesh = hm
-			hull.material_override = _make_mat(Color("#0284C7"), 0.3, 1.0, 0.65, 0.3)
+			hull.material_override = _make_unit_mat(Color("#38BDF8"), 0.20)
 			body_pivot.add_child(hull)
 			var rmat := _make_mat(Color("#38BDF8"), 2.8, 0.9, 0.1, 0.1)
 			var rotors: Array[Node3D] = []
