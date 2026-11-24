@@ -22,7 +22,7 @@ var last_msg_key: String = "msg_ready"
 
 func _ready() -> void:
 	_load_towers_catalog()
-	current_speed = SettingsManager.default_speed
+	current_speed = SettingsManager.default_speed if SettingsManager.is_fast_speed_unlocked() else 1
 	grid_manager.game_speed = float(current_speed)
 	ui.set_speed_display(current_speed)
 
@@ -38,7 +38,10 @@ func _ready() -> void:
 	grid_manager.core_damaged.connect(_on_core_damaged)
 	grid_manager.wave_state_changed.connect(_on_wave_state_changed)
 	grid_manager.wave_cleared.connect(_on_wave_cleared)
-	grid_manager.level_victory.connect(func(): ui.show_result(true))
+	grid_manager.level_victory.connect(func():
+		SettingsManager.mark_level_completed(current_level_index)
+		ui.show_result(true)
+	)
 	grid_manager.level_defeat.connect(func(): ui.show_result(false))
 	grid_manager.sfx_requested.connect(func(n: String): sfx.play(n))
 
@@ -224,6 +227,13 @@ func _on_start_wave() -> void:
 
 
 func _on_cycle_speed() -> void:
+	if not SettingsManager.is_fast_speed_unlocked():
+		current_speed = 1
+		grid_manager.game_speed = 1.0
+		ui.set_speed_display(1)
+		last_msg_key = "msg_speed_locked"
+		_refresh_hud()
+		return
 	current_speed = 1 if current_speed >= 3 else current_speed + 1
 	grid_manager.game_speed = float(current_speed)
 	ui.set_speed_display(current_speed)

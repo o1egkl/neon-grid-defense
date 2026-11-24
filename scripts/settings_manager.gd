@@ -24,6 +24,7 @@ var show_path_preview: bool = true
 var show_grid_lines: bool = true
 var default_speed: int = 1
 var difficulty: String = "easy"
+var completed_levels: Array = []
 
 
 func _ready() -> void:
@@ -103,8 +104,33 @@ func set_show_grid_lines(val: bool) -> void:
 	settings_changed.emit()
 
 
+func is_fast_speed_unlocked() -> bool:
+	return completed_levels.size() >= 20
+
+
+func get_completed_count() -> int:
+	return completed_levels.size()
+
+
+func is_level_completed(level_id: int) -> bool:
+	return level_id in completed_levels
+
+
+func mark_level_completed(level_id: int) -> void:
+	if level_id < 1 or level_id > 20:
+		return
+	if not (level_id in completed_levels):
+		completed_levels.append(level_id)
+		completed_levels.sort()
+		save_settings()
+		settings_changed.emit()
+
+
 func set_default_speed(val: int) -> void:
-	default_speed = clampi(val, 1, 3)
+	if not is_fast_speed_unlocked():
+		default_speed = 1
+	else:
+		default_speed = clampi(val, 1, 3)
 	save_settings()
 	settings_changed.emit()
 
@@ -146,7 +172,8 @@ func save_settings() -> void:
 		"show_path_preview": show_path_preview,
 		"show_grid_lines": show_grid_lines,
 		"default_speed": default_speed,
-		"difficulty": difficulty
+		"difficulty": difficulty,
+		"completed_levels": completed_levels
 	}
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file:
@@ -179,3 +206,12 @@ func _load_settings() -> void:
 	var saved_diff := str(parsed.get("difficulty", difficulty))
 	if saved_diff == "easy" or saved_diff == "hard" or saved_diff == "nightmare":
 		difficulty = saved_diff
+	var raw_comp: Variant = parsed.get("completed_levels", [])
+	completed_levels.clear()
+	if raw_comp is Array:
+		for lid in raw_comp:
+			var iv: int = int(lid)
+			if iv >= 1 and iv <= 20 and not (iv in completed_levels):
+				completed_levels.append(iv)
+	if not is_fast_speed_unlocked():
+		default_speed = 1

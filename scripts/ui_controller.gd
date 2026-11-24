@@ -115,6 +115,7 @@ var _chk_path: CheckBox
 var _chk_grid: CheckBox
 var _lbl_speed: Label
 var _speed_buttons: Array[Button] = []
+var _lbl_speed_hint: Label
 var _btn_play: Button
 var _btn_open_guide: Button
 var _btn_open_levels: Button
@@ -239,7 +240,9 @@ func set_wave_button_active(active: bool) -> void:
 func set_speed_display(spd: int) -> void:
 	_current_speed = spd
 	if _hud_btn_speed:
-		_hud_btn_speed.text = "%dx" % spd
+		var unlocked: bool = SettingsManager.is_fast_speed_unlocked()
+		_hud_btn_speed.text = ("%dx" % spd) if unlocked else "1x"
+		_style_button(_hud_btn_speed, Color("#F59E0B") if unlocked else Color("#64748B"), false, not unlocked)
 
 
 func set_available_towers(towers: Array, selected_id: String, gold: int) -> void:
@@ -906,6 +909,11 @@ func _build_settings_panel(parent: Control) -> void:
 		speed_row.add_child(sb)
 		_speed_buttons.append(sb)
 
+	_lbl_speed_hint = Label.new()
+	_lbl_speed_hint.add_theme_font_size_override("font_size", 11)
+	_lbl_speed_hint.add_theme_color_override("font_color", Color("#94A3B8"))
+	speed_row.add_child(_lbl_speed_hint)
+
 	var sp := Control.new()
 	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	vbox.add_child(sp)
@@ -1171,10 +1179,12 @@ func _rebuild_level_buttons() -> void:
 		var id: int = int(lvl.get("id", 1))
 		var nm: String = str(lvl.get("name", "Level %02d" % id))
 		var w: int = int(lvl.get("waves", 10))
+		var done: bool = SettingsManager.is_level_completed(id)
 		var b := Button.new()
-		b.text = "%s\n(%d %s)" % [nm, w, waves_word]
+		b.text = "%s%s\n(%d %s)" % [nm, " [OK]" if done else "", w, waves_word]
 		b.custom_minimum_size = Vector2(175, 62)
-		_style_button(b, Color("#00E5FF") if not bool(lvl.get("has_air", false)) else Color("#F97316"))
+		var b_col: Color = Color("#10B981") if done else (Color("#00E5FF") if not bool(lvl.get("has_air", false)) else Color("#F97316"))
+		_style_button(b, b_col, done)
 		b.pressed.connect(func():
 			level_selected.emit(id)
 			close_overlays()
@@ -1197,9 +1207,16 @@ func _sync_settings_controls() -> void:
 		var b: Button = _lang_buttons[code]
 		_style_button(b, Color("#00E5FF"), code == SettingsManager.language)
 
+	var spd_unlocked: bool = SettingsManager.is_fast_speed_unlocked()
 	for i in _speed_buttons.size():
 		var spd: int = i + 1
-		_style_button(_speed_buttons[i], Color("#3B82F6"), spd == SettingsManager.default_speed)
+		var btn_s: Button = _speed_buttons[i]
+		var is_locked: bool = (spd > 1 and not spd_unlocked)
+		btn_s.disabled = is_locked
+		_style_button(btn_s, Color("#3B82F6"), spd == SettingsManager.default_speed, is_locked)
+	if _lbl_speed_hint:
+		_lbl_speed_hint.visible = not spd_unlocked
+		_lbl_speed_hint.text = SettingsManager.tr_key("speed_locked_hint") % SettingsManager.get_completed_count()
 
 
 func _apply_translations() -> void:
@@ -1224,6 +1241,7 @@ func _apply_translations() -> void:
 	_hud_btn_guide.text = "?" if vp_w < 1260.0 else ("? " + SettingsManager.tr_key("btn_how_to_play"))
 	_hud_btn_settings.text = SettingsManager.tr_key("btn_settings")
 	_shop_title_label.text = SettingsManager.tr_key("shop_title")
+	set_speed_display(_current_speed)
 	set_wave_button_active(_wave_active)
 
 	_lbl_guide_title.text = SettingsManager.tr_key("guide_title")
