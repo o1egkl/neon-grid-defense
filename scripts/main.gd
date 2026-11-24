@@ -58,6 +58,7 @@ func _ready() -> void:
 	ui.confirm_build_requested.connect(func(): grid_manager.confirm_pending_build())
 	ui.cancel_build_requested.connect(func(): grid_manager.clear_build_preview())
 	SettingsManager.language_changed.connect(func(_c: String): _refresh_hud())
+	SettingsManager.difficulty_changed.connect(_on_difficulty_changed)
 
 	_load_level(1)
 
@@ -134,8 +135,9 @@ func _load_level(idx: int) -> void:
 
 func _on_level_loaded(data: Dictionary) -> void:
 	level_name = str(data.get("name", "Level %02d" % current_level_index))
-	gold = int(data.get("start_gold", 220))
-	cores = int(data.get("cores_count", 10))
+	var mods: Dictionary = SettingsManager.get_difficulty_mods()
+	gold = int(roundf(float(data.get("start_gold", 220)) * float(mods.get("gold_mult", 1.0))))
+	cores = int(mods.get("cores", 10))
 	current_wave = 0
 	var waves: Array = data.get("waves", [])
 	total_waves = waves.size()
@@ -233,15 +235,24 @@ func _on_wave_state_changed(wave_num: int, t_waves: int, active: bool) -> void:
 	_refresh_hud()
 
 
+func _on_difficulty_changed(_diff_id: String) -> void:
+	if current_wave == 0 and not grid_manager.is_wave_active() and grid_manager._placed_towers.is_empty():
+		_load_level(current_level_index)
+	else:
+		_refresh_hud()
+
+
 func _on_wave_cleared(bonus_gold: int) -> void:
+	var b_mult: float = float(SettingsManager.get_difficulty_mods().get("bounty_mult", 1.0))
 	var interest: int = int(floorf(float(gold) * 0.05))
-	gold += bonus_gold + interest
+	gold += int(roundf(float(bonus_gold) * b_mult)) + interest
 	last_msg_key = "msg_wave_cleared"
 	_refresh_hud()
 
 
 func _on_enemy_killed(bounty: int) -> void:
-	gold += bounty
+	var b_mult: float = float(SettingsManager.get_difficulty_mods().get("bounty_mult", 1.0))
+	gold += max(1, int(roundf(float(bounty) * b_mult)))
 	_refresh_hud()
 
 

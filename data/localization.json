@@ -104,7 +104,14 @@
       "msg_max_level": "Tower is already at MAX level!",
       "btn_build": "BUILD",
       "btn_cancel": "CANCEL",
-      "hint_confirm_build": "Click cell again or press BUILD"
+      "hint_confirm_build": "Click cell again or press BUILD",
+      "diff_label": "Difficulty",
+      "diff_easy": "Easy",
+      "diff_hard": "Hard",
+      "diff_nightmare": "Nightmare",
+      "diff_desc_easy": "Enemy HP x0.75  |  Speed x0.90  |  Cores: 15  |  Start Credits: 130%",
+      "diff_desc_hard": "Enemy HP x1.25  |  Speed x1.05  |  Cores: 10  |  Start Credits: 100%",
+      "diff_desc_nightmare": "Enemy HP x1.75  |  Speed x1.18  |  Cores: 5  |  Start Credits: 85%"
     },
     "es": {
       "game_title": "NEON GRID DEFENSE",
@@ -180,7 +187,14 @@
       "msg_max_level": "¡La torre ya está al nivel máximo!",
       "btn_build": "CONSTRUIR",
       "btn_cancel": "CANCELAR",
-      "hint_confirm_build": "Haz clic otra vez o pulsa CONSTRUIR"
+      "hint_confirm_build": "Haz clic otra vez o pulsa CONSTRUIR",
+      "diff_label": "Dificultad",
+      "diff_easy": "Fácil",
+      "diff_hard": "Difícil",
+      "diff_nightmare": "Pesadilla",
+      "diff_desc_easy": "HP x0.75  |  Velocidad x0.90  |  Núcleos: 15  |  Créditos: 130%",
+      "diff_desc_hard": "HP x1.25  |  Velocidad x1.05  |  Núcleos: 10  |  Créditos: 100%",
+      "diff_desc_nightmare": "HP x1.75  |  Velocidad x1.18  |  Núcleos: 5  |  Créditos: 85%"
     },
     "ru": {
       "game_title": "NEON GRID DEFENSE",
@@ -256,7 +270,14 @@
       "msg_max_level": "Башня уже максимального уровня!",
       "btn_build": "ПОСТРОИТЬ",
       "btn_cancel": "ОТМЕНА",
-      "hint_confirm_build": "Кликните ещё раз или нажмите ПОСТРОИТЬ"
+      "hint_confirm_build": "Кликните ещё раз или нажмите ПОСТРОИТЬ",
+      "diff_label": "Сложность",
+      "diff_easy": "Лёгкий",
+      "diff_hard": "Сложный",
+      "diff_nightmare": "Кошмар",
+      "diff_desc_easy": "HP врагов x0.75  |  Скорость x0.90  |  Ядра: 15  |  Старт: 130%",
+      "diff_desc_hard": "HP врагов x1.25  |  Скорость x1.05  |  Ядра: 10  |  Старт: 100%",
+      "diff_desc_nightmare": "HP врагов x1.75  |  Скорость x1.18  |  Ядра: 5  |  Старт: 85%"
     },
     "pt": {
       "game_title": "NEON GRID DEFENSE",
@@ -332,7 +353,14 @@
       "msg_max_level": "A torre já está no nível máximo!",
       "btn_build": "CONSTRUIR",
       "btn_cancel": "CANCELAR",
-      "hint_confirm_build": "Clique novamente ou prima CONSTRUIR"
+      "hint_confirm_build": "Clique novamente ou prima CONSTRUIR",
+      "diff_label": "Dificuldade",
+      "diff_easy": "Fácil",
+      "diff_hard": "Difícil",
+      "diff_nightmare": "Pesadelo",
+      "diff_desc_easy": "HP x0.75  |  Velocidade x0.90  |  Núcleos: 15  |  Créditos: 130%",
+      "diff_desc_hard": "HP x1.25  |  Velocidade x1.05  |  Núcleos: 10  |  Créditos: 100%",
+      "diff_desc_nightmare": "HP x1.75  |  Velocidade x1.18  |  Núcleos: 5  |  Créditos: 85%"
     },
     "fr": {
       "game_title": "NEON GRID DEFENSE",
@@ -408,7 +436,14 @@
       "msg_max_level": "Tour déjà au niveau maximum !",
       "btn_build": "CONSTRUIRE",
       "btn_cancel": "ANNULER",
-      "hint_confirm_build": "Cliquez à nouveau ou sur CONSTRUIRE"
+      "hint_confirm_build": "Cliquez à nouveau ou sur CONSTRUIRE",
+      "diff_label": "Difficulté",
+      "diff_easy": "Facile",
+      "diff_hard": "Difficile",
+      "diff_nightmare": "Cauchemar",
+      "diff_desc_easy": "PV x0.75  |  Vitesse x0.90  |  Coeurs: 15  |  Crédits: 130%",
+      "diff_desc_hard": "PV x1.25  |  Vitesse x1.05  |  Coeurs: 10  |  Crédits: 100%",
+      "diff_desc_nightmare": "PV x1.75  |  Vitesse x1.18  |  Coeurs: 5  |  Crédits: 85%"
     },
     "de": {
       "game_title": "NEON GRID DEFENSE",
@@ -484,7 +519,14 @@
       "msg_max_level": "Turm ist bereits auf Max-Level!",
       "btn_build": "BAUEN",
       "btn_cancel": "ABBRECHEN",
-      "hint_confirm_build": "Erneut klicken oder BAUEN drücken"
+      "hint_confirm_build": "Erneut klicken oder BAUEN drücken",
+      "diff_label": "Schwierigkeit",
+      "diff_easy": "Leicht",
+      "diff_hard": "Schwer",
+      "diff_nightmare": "Albtraum",
+      "diff_desc_easy": "HP x0.75  |  Tempo x0.90  |  Kerne: 15  |  Credits: 130%",
+      "diff_desc_hard": "HP x1.25  |  Tempo x1.05  |  Kerne: 10  |  Credits: 100%",
+      "diff_desc_nightmare": "HP x1.75  |  Tempo x1.18  |  Kerne: 5  |  Credits: 85%"
     },
     "it": {
       "game_title": "NEON GRID DEFENSE",
@@ -560,7 +602,14 @@
       "msg_max_level": "La torre è già al livello massimo!",
       "btn_build": "COSTRUISCI",
       "btn_cancel": "ANNULLA",
-      "hint_confirm_build": "Clicca ancora o premi COSTRUISCI"
+      "hint_confirm_build": "Clicca ancora o premi COSTRUISCI",
+      "diff_label": "Difficoltà",
+      "diff_easy": "Facile",
+      "diff_hard": "Difficile",
+      "diff_nightmare": "Incubo",
+      "diff_desc_easy": "HP x0.75  |  Velocità x0.90  |  Nuclei: 15  |  Crediti: 130%",
+      "diff_desc_hard": "HP x1.25  |  Velocità x1.05  |  Nuclei: 10  |  Crediti: 100%",
+      "diff_desc_nightmare": "HP x1.75  |  Velocità x1.18  |  Nuclei: 5  |  Crediti: 85%"
     }
   }
 }

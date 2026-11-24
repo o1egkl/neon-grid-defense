@@ -38,6 +38,8 @@ var _last_result_is_victory: bool = true
 var _hud_bar: PanelContainer
 var _pill_level: PanelContainer
 var _lbl_level: Label
+var _pill_diff: PanelContainer
+var _lbl_diff: Label
 var _pill_credits: PanelContainer
 var _lbl_credits: Label
 var _pill_cores: PanelContainer
@@ -91,6 +93,11 @@ var _lbl_subtitle: Label
 var _lbl_settings_title: Label
 var _lbl_lang: Label
 var _lang_buttons: Dictionary = {}
+var _lbl_diff_title: Label
+var _lbl_diff_desc: Label
+var _diff_buttons_settings: Dictionary = {}
+var _diff_buttons_levels: Dictionary = {}
+var _lbl_levels_diff_desc: Label
 var _lbl_master: Label
 var _lbl_sfx: Label
 var _lbl_music: Label
@@ -143,6 +150,7 @@ func _ready() -> void:
 	_build_preview_bar()
 	_build_overlays()
 	SettingsManager.language_changed.connect(_on_language_changed)
+	SettingsManager.difficulty_changed.connect(func(_d: String): _sync_difficulty_ui())
 	_apply_translations()
 	show_settings()
 
@@ -166,7 +174,34 @@ func show_settings() -> void:
 	_guide_panel.visible = false
 	_levels_panel.visible = false
 	_result_panel.visible = false
+	_lbl_diff_title.text = SettingsManager.tr_key("diff_label")
+	_sync_difficulty_ui()
 	_sync_settings_controls()
+
+
+func _sync_difficulty_ui() -> void:
+	var cur_d: String = SettingsManager.difficulty
+	var colors := {"easy": Color("#10B981"), "hard": Color("#F59E0B"), "nightmare": Color("#EF4444")}
+	for did in ["easy", "hard", "nightmare"]:
+		var active: bool = (did == cur_d)
+		var col: Color = colors[did]
+		var txt: String = SettingsManager.tr_key("diff_" + did)
+		if _diff_buttons_settings.has(did):
+			var bs: Button = _diff_buttons_settings[did]
+			bs.text = txt
+			_style_button(bs, col, active)
+		if _diff_buttons_levels.has(did):
+			var bl: Button = _diff_buttons_levels[did]
+			bl.text = txt
+			_style_button(bl, col, active)
+	var desc_txt: String = SettingsManager.tr_key("diff_desc_" + cur_d)
+	var d_col: Color = colors.get(cur_d, Color("#10B981"))
+	if _lbl_diff_desc:
+		_lbl_diff_desc.text = desc_txt
+		_lbl_diff_desc.add_theme_color_override("font_color", d_col.lightened(0.25))
+	if _lbl_levels_diff_desc:
+		_lbl_levels_diff_desc.text = desc_txt
+		_lbl_levels_diff_desc.add_theme_color_override("font_color", d_col.lightened(0.25))
 	_apply_translations()
 	overlay_visibility_changed.emit(true)
 
@@ -247,8 +282,15 @@ func update_hud(level_name: String, gold: int, cores: int, cur_wave: int, total_
 	if not _lbl_level:
 		return
 	_lbl_level.text = level_name.to_upper()
+	var d_mods: Dictionary = SettingsManager.get_difficulty_mods()
+	var d_id: String = str(d_mods.get("id", "easy"))
+	var d_col := Color(str(d_mods.get("color", "#10B981")))
+	var max_cores: int = int(d_mods.get("cores", 10))
+	_pill_diff.add_theme_stylebox_override("panel", _make_pill_style(Color(d_col.r * 0.22, d_col.g * 0.22, d_col.b * 0.22, 1.0), d_col))
+	_lbl_diff.text = SettingsManager.tr_key("diff_" + d_id).to_upper()
+	_lbl_diff.add_theme_color_override("font_color", d_col.lightened(0.35))
 	_lbl_credits.text = "%s: %d" % [SettingsManager.tr_key("hud_credits").to_upper(), gold]
-	_lbl_cores.text = "%s: %d/10" % [SettingsManager.tr_key("hud_cores").to_upper(), cores]
+	_lbl_cores.text = "%s: %d/%d" % [SettingsManager.tr_key("hud_cores").to_upper(), cores, max_cores]
 	_lbl_wave.text = "%s: %d/%d" % [SettingsManager.tr_key("hud_waves").to_upper(), cur_wave, total_waves]
 
 	# Красная тревога на бейдже Ядер, если осталось <= 3
@@ -365,6 +407,10 @@ func _build_hud() -> void:
 	var p_lvl: Array = _make_hud_pill(hbox, Color("#071E2E"), Color("#00E5FF"), Color("#E0F7FA"))
 	_pill_level = p_lvl[0]
 	_lbl_level = p_lvl[1]
+
+	var p_dif: Array = _make_hud_pill(hbox, Color("#07221B"), Color("#10B981"), Color("#6EE7B7"))
+	_pill_diff = p_dif[0]
+	_lbl_diff = p_dif[1]
 
 	var p_cr: Array = _make_hud_pill(hbox, Color("#261D06"), Color("#FACC15"), Color("#FEF08A"))
 	_pill_credits = p_cr[0]
@@ -703,12 +749,12 @@ func _build_overlays() -> void:
 
 func _build_settings_panel(parent: Control) -> void:
 	_settings_panel = PanelContainer.new()
-	_settings_panel.custom_minimum_size = Vector2(760, 520)
+	_settings_panel.custom_minimum_size = Vector2(760, 590)
 	_settings_panel.add_theme_stylebox_override("panel", _make_panel_style(Color("#0F172A"), Color("#00E5FF"), 12, 2))
 	parent.add_child(_settings_panel)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 12)
+	vbox.add_theme_constant_override("separation", 9)
 	_settings_panel.add_child(vbox)
 
 	_lbl_game_title = Label.new()
@@ -744,11 +790,36 @@ func _build_settings_panel(parent: Control) -> void:
 		var code: String = str(lang.get("code", "en"))
 		var b := Button.new()
 		b.text = str(lang.get("name", code.to_upper()))
-		b.custom_minimum_size = Vector2(96, 34)
+		b.custom_minimum_size = Vector2(96, 32)
 		_style_button(b, Color("#00E5FF"))
 		b.pressed.connect(func(): SettingsManager.set_language(code))
 		lang_row.add_child(b)
 		_lang_buttons[code] = b
+
+	_lbl_diff_title = Label.new()
+	_lbl_diff_title.add_theme_color_override("font_color", Color("#CBD5E1"))
+	vbox.add_child(_lbl_diff_title)
+
+	var diff_row := HBoxContainer.new()
+	diff_row.add_theme_constant_override("separation", 10)
+	diff_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	vbox.add_child(diff_row)
+
+	for d_cfg in [["easy", "#10B981"], ["hard", "#F59E0B"], ["nightmare", "#EF4444"]]:
+		var did: String = d_cfg[0]
+		var dcol := Color(d_cfg[1])
+		var db := Button.new()
+		db.custom_minimum_size = Vector2(180, 34)
+		_style_button(db, dcol)
+		db.pressed.connect(func(): SettingsManager.set_difficulty(did))
+		diff_row.add_child(db)
+		_diff_buttons_settings[did] = db
+
+	_lbl_diff_desc = Label.new()
+	_lbl_diff_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lbl_diff_desc.add_theme_font_size_override("font_size", 12)
+	_lbl_diff_desc.add_theme_color_override("font_color", Color("#94A3B8"))
+	vbox.add_child(_lbl_diff_desc)
 
 	vbox.add_child(HSeparator.new())
 
@@ -810,7 +881,34 @@ func _build_settings_panel(parent: Control) -> void:
 		_style_button(sb, Color("#3B82F6"))
 		sb.pressed.connect(func():
 			SettingsManager.set_default_speed(spd)
-			_sync_settings_controls()
+			_lbl_diff_title.text = SettingsManager.tr_key("diff_label")
+	_sync_difficulty_ui()
+	_sync_settings_controls()
+
+
+func _sync_difficulty_ui() -> void:
+	var cur_d: String = SettingsManager.difficulty
+	var colors := {"easy": Color("#10B981"), "hard": Color("#F59E0B"), "nightmare": Color("#EF4444")}
+	for did in ["easy", "hard", "nightmare"]:
+		var active: bool = (did == cur_d)
+		var col: Color = colors[did]
+		var txt: String = SettingsManager.tr_key("diff_" + did)
+		if _diff_buttons_settings.has(did):
+			var bs: Button = _diff_buttons_settings[did]
+			bs.text = txt
+			_style_button(bs, col, active)
+		if _diff_buttons_levels.has(did):
+			var bl: Button = _diff_buttons_levels[did]
+			bl.text = txt
+			_style_button(bl, col, active)
+	var desc_txt: String = SettingsManager.tr_key("diff_desc_" + cur_d)
+	var d_col: Color = colors.get(cur_d, Color("#10B981"))
+	if _lbl_diff_desc:
+		_lbl_diff_desc.text = desc_txt
+		_lbl_diff_desc.add_theme_color_override("font_color", d_col.lightened(0.25))
+	if _lbl_levels_diff_desc:
+		_lbl_levels_diff_desc.text = desc_txt
+		_lbl_levels_diff_desc.add_theme_color_override("font_color", d_col.lightened(0.25))
 		)
 		speed_row.add_child(sb)
 		_speed_buttons.append(sb)
@@ -981,6 +1079,27 @@ func _build_levels_panel(parent: Control) -> void:
 	_lbl_levels_title.add_theme_color_override("font_color", Color("#3B82F6"))
 	v.add_child(_lbl_levels_title)
 
+	var l_diff_row := HBoxContainer.new()
+	l_diff_row.add_theme_constant_override("separation", 10)
+	l_diff_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	v.add_child(l_diff_row)
+
+	for d_cfg in [["easy", "#10B981"], ["hard", "#F59E0B"], ["nightmare", "#EF4444"]]:
+		var did: String = d_cfg[0]
+		var dcol := Color(d_cfg[1])
+		var db := Button.new()
+		db.custom_minimum_size = Vector2(170, 32)
+		_style_button(db, dcol)
+		db.pressed.connect(func(): SettingsManager.set_difficulty(did))
+		l_diff_row.add_child(db)
+		_diff_buttons_levels[did] = db
+
+	_lbl_levels_diff_desc = Label.new()
+	_lbl_levels_diff_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lbl_levels_diff_desc.add_theme_font_size_override("font_size", 12)
+	_lbl_levels_diff_desc.add_theme_color_override("font_color", Color("#94A3B8"))
+	v.add_child(_lbl_levels_diff_desc)
+
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(scroll)
@@ -1133,4 +1252,31 @@ func _apply_translations() -> void:
 	_btn_result_retry.text = SettingsManager.tr_key("btn_retry")
 	_btn_result_next.text = SettingsManager.tr_key("btn_next_level")
 
+	_lbl_diff_title.text = SettingsManager.tr_key("diff_label")
+	_sync_difficulty_ui()
 	_sync_settings_controls()
+
+
+func _sync_difficulty_ui() -> void:
+	var cur_d: String = SettingsManager.difficulty
+	var colors := {"easy": Color("#10B981"), "hard": Color("#F59E0B"), "nightmare": Color("#EF4444")}
+	for did in ["easy", "hard", "nightmare"]:
+		var active: bool = (did == cur_d)
+		var col: Color = colors[did]
+		var txt: String = SettingsManager.tr_key("diff_" + did)
+		if _diff_buttons_settings.has(did):
+			var bs: Button = _diff_buttons_settings[did]
+			bs.text = txt
+			_style_button(bs, col, active)
+		if _diff_buttons_levels.has(did):
+			var bl: Button = _diff_buttons_levels[did]
+			bl.text = txt
+			_style_button(bl, col, active)
+	var desc_txt: String = SettingsManager.tr_key("diff_desc_" + cur_d)
+	var d_col: Color = colors.get(cur_d, Color("#10B981"))
+	if _lbl_diff_desc:
+		_lbl_diff_desc.text = desc_txt
+		_lbl_diff_desc.add_theme_color_override("font_color", d_col.lightened(0.25))
+	if _lbl_levels_diff_desc:
+		_lbl_levels_diff_desc.text = desc_txt
+		_lbl_levels_diff_desc.add_theme_color_override("font_color", d_col.lightened(0.25))

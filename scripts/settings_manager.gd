@@ -6,6 +6,7 @@ extends Node
 ## - Применяет громкость к AudioServer и рассылает сигналы обновления UI
 
 signal language_changed(lang_code: String)
+signal difficulty_changed(diff_id: String)
 signal settings_changed()
 
 const SAVE_PATH := "user://settings.json"
@@ -22,6 +23,7 @@ var muted: bool = false
 var show_path_preview: bool = true
 var show_grid_lines: bool = true
 var default_speed: int = 1
+var difficulty: String = "easy"
 
 
 func _ready() -> void:
@@ -107,6 +109,26 @@ func set_default_speed(val: int) -> void:
 	settings_changed.emit()
 
 
+func set_difficulty(diff_id: String) -> void:
+	if diff_id != "easy" and diff_id != "hard" and diff_id != "nightmare":
+		return
+	if difficulty != diff_id:
+		difficulty = diff_id
+		save_settings()
+		difficulty_changed.emit(difficulty)
+		settings_changed.emit()
+
+
+func get_difficulty_mods() -> Dictionary:
+	match difficulty:
+		"hard":
+			return {"id": "hard", "hp_mult": 1.25, "speed_mult": 1.05, "gold_mult": 1.00, "bounty_mult": 1.00, "cores": 10, "color": "#F59E0B"}
+		"nightmare":
+			return {"id": "nightmare", "hp_mult": 1.75, "speed_mult": 1.18, "gold_mult": 0.85, "bounty_mult": 0.90, "cores": 5, "color": "#EF4444"}
+		_:
+			return {"id": "easy", "hp_mult": 0.75, "speed_mult": 0.90, "gold_mult": 1.30, "bounty_mult": 1.15, "cores": 15, "color": "#10B981"}
+
+
 func _apply_audio() -> void:
 	var master_idx := AudioServer.get_bus_index("Master")
 	if master_idx >= 0:
@@ -123,7 +145,8 @@ func save_settings() -> void:
 		"muted": muted,
 		"show_path_preview": show_path_preview,
 		"show_grid_lines": show_grid_lines,
-		"default_speed": default_speed
+		"default_speed": default_speed,
+		"difficulty": difficulty
 	}
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file:
@@ -153,3 +176,6 @@ func _load_settings() -> void:
 	show_path_preview = bool(parsed.get("show_path_preview", show_path_preview))
 	show_grid_lines = bool(parsed.get("show_grid_lines", show_grid_lines))
 	default_speed = int(parsed.get("default_speed", default_speed))
+	var saved_diff := str(parsed.get("difficulty", difficulty))
+	if saved_diff == "easy" or saved_diff == "hard" or saved_diff == "nightmare":
+		difficulty = saved_diff

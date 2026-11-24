@@ -523,7 +523,8 @@ func load_level_from_file(path: String) -> bool:
 	core_cell = Vector2i(int(cp[0]), int(cp[1]))
 	walls = _parse_vec2i_array(parsed.get("walls", []))
 	boost_tiles = _parse_vec2i_array(parsed.get("boost_tiles", []))
-	cores_remaining = int(parsed.get("cores_count", 10))
+	var diff_mods: Dictionary = SettingsManager.get_difficulty_mods()
+	cores_remaining = int(diff_mods.get("cores", 10))
 	_waves_data = parsed.get("waves", [])
 
 	fixed_paths.clear()
@@ -1524,8 +1525,11 @@ func _spawn_enemy(item: Dictionary) -> void:
 	var pts: PackedVector3Array = smooth_paths[pidx] if pidx < smooth_paths.size() else PackedVector3Array([cell_to_world_3d(core_cell)])
 	var is_flying: bool = bool(base.get("is_flying", false))
 	var start_pos: Vector3 = pts[0] + Vector3(0.0, 1.15 if is_flying else 0.02, 0.0)
-	var max_hp: float = float(base.get("hp", 80)) * hp_mult
-	var max_shield: float = float(base.get("shield", 0)) * hp_mult
+	var diff_mods: Dictionary = SettingsManager.get_difficulty_mods()
+	var d_hp: float = float(diff_mods.get("hp_mult", 1.0))
+	var d_spd: float = float(diff_mods.get("speed_mult", 1.0))
+	var max_hp: float = float(base.get("hp", 80)) * hp_mult * d_hp
+	var max_shield: float = float(base.get("shield", 0)) * hp_mult * d_hp
 	var elite: bool = bool(item.get("elite", false))
 
 	var visual: Dictionary = _build_animated_enemy(eid, elite, max_shield > 0.0)
@@ -1543,7 +1547,7 @@ func _spawn_enemy(item: Dictionary) -> void:
 		"id": eid, "pos": start_pos, "path_idx": pidx, "wp_idx": 1, "progress": 0.0,
 		"yaw": init_yaw, "walk_phase": randf() * TAU,
 		"hp": max_hp, "max_hp": max_hp, "shield": max_shield, "max_shield": max_shield,
-		"armor": float(base.get("armor", 0)), "speed": float(base.get("speed", 90)) * PX_TO_WORLD,
+		"armor": float(base.get("armor", 0)), "speed": float(base.get("speed", 90)) * PX_TO_WORLD * d_spd,
 		"bounty": int(base.get("bounty", 8)), "is_flying": is_flying, "elite": elite,
 		"slow_timer": 0.0, "slow_factor": 1.0, "medic_cd": 2.0, "shield_regen_cd": 0.0,
 		"node": node, "parts": visual["parts"], "shield_mesh": visual["shield"], "hp_bar": visual["hp_bar"]
@@ -2222,9 +2226,10 @@ func _damage_enemy_at(idx: int, raw_dmg: float, dmg_type: String, is_crit: bool)
 				_enemies.append({
 					"id": "swarm", "pos": spos, "path_idx": pidx, "wp_idx": wp_idx, "progress": prog,
 					"yaw": float(e["yaw"]), "walk_phase": randf() * TAU,
-					"hp": float(sw.get("hp", 35)), "max_hp": float(sw.get("hp", 35)),
+					"hp": float(sw.get("hp", 35)) * float(SettingsManager.get_difficulty_mods().get("hp_mult", 1.0)),
+					"max_hp": float(sw.get("hp", 35)) * float(SettingsManager.get_difficulty_mods().get("hp_mult", 1.0)),
 					"shield": 0.0, "max_shield": 0.0, "armor": 0.0,
-					"speed": float(sw.get("speed", 140)) * PX_TO_WORLD,
+					"speed": float(sw.get("speed", 140)) * PX_TO_WORLD * float(SettingsManager.get_difficulty_mods().get("speed_mult", 1.0)),
 					"bounty": int(sw.get("bounty", 4)), "is_flying": false, "elite": false,
 					"slow_timer": 0.0, "slow_factor": 1.0, "medic_cd": 99.0, "shield_regen_cd": 0.0,
 					"node": snode, "parts": vis["parts"], "shield_mesh": null, "hp_bar": vis["hp_bar"]
