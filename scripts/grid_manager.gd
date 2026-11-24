@@ -1025,6 +1025,21 @@ func _handle_right_click(cell: Vector2i) -> void:
 	tower_remove_requested.emit(cell, refund)
 
 
+func _get_nearest_road_yaw(world_pos: Vector3) -> float:
+	var best_dist_sq: float = INF
+	var best_pt: Vector3 = world_pos + Vector3.FORWARD
+	for spath in smooth_paths:
+		var pts: PackedVector3Array = spath
+		for p in pts:
+			var dx: float = p.x - world_pos.x
+			var dz: float = p.z - world_pos.z
+			var d_sq: float = dx * dx + dz * dz
+			if d_sq < best_dist_sq and d_sq > 0.001:
+				best_dist_sq = d_sq
+				best_pt = p
+	return atan2(best_pt.x - world_pos.x, best_pt.z - world_pos.z)
+
+
 func commit_place_tower(cell: Vector2i, tower_cfg: Dictionary) -> void:
 	_cells[cell] = CellType.TOWER
 	var tid: String = str(tower_cfg.get("id", "pulse"))
@@ -1033,6 +1048,11 @@ func commit_place_tower(cell: Vector2i, tower_cfg: Dictionary) -> void:
 	var root_node: Node3D = built["root"]
 	root_node.position = cell_to_world_3d(cell)
 	_towers_root.add_child(root_node)
+
+	var init_yaw: float = _get_nearest_road_yaw(root_node.position)
+	var head_node: Node3D = built["head"]
+	if is_instance_valid(head_node):
+		head_node.rotation.y = init_yaw
 
 	var base_cost: int = int(tower_cfg.get("cost", 25))
 	var runtime_cfg: Dictionary = tower_cfg.duplicate()
@@ -1047,7 +1067,7 @@ func commit_place_tower(cell: Vector2i, tower_cfg: Dictionary) -> void:
 	runtime_cfg["base_chain_count"] = int(tower_cfg.get("chain_count", 3))
 	runtime_cfg["cooldown"] = 0.0
 	runtime_cfg["recoil"] = 0.0
-	runtime_cfg["yaw"] = 0.0
+	runtime_cfg["yaw"] = init_yaw
 	runtime_cfg["node"] = root_node
 	runtime_cfg["head"] = built["head"]
 	runtime_cfg["barrel_group"] = built["barrel_group"]
