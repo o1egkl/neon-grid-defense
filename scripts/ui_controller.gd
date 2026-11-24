@@ -854,7 +854,7 @@ func _build_settings_panel(parent: Control) -> void:
 		_style_button(sb, Color("#3B82F6"))
 		sb.pressed.connect(func():
 			SettingsManager.set_default_speed(spd)
-					_sync_settings_controls()
+			_sync_settings_controls()
 		)
 		speed_row.add_child(sb)
 		_speed_buttons.append(sb)
