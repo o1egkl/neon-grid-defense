@@ -398,7 +398,7 @@ func _apply_tower_upgrade_visuals(cell: Vector2i, t: Dictionary) -> void:
 	var lvl: int = int(t["level"])
 	var head: Node3D = t.get("head", null)
 	var rank_group: Node3D = t.get("rank_group", null)
-	var lbl: Label3D = t.get("level_label", null)
+	var badge: Sprite3D = t.get("level_badge", null)
 	var col := Color(str(t.get("color", "#00E5FF")))
 	var ring_col: Color = Color("#FACC15") if lvl == MAX_TOWER_LEVEL else col
 
@@ -443,10 +443,13 @@ func _apply_tower_upgrade_visuals(cell: Vector2i, t: Dictionary) -> void:
 				fin.material_override = fin_mat
 				rank_group.add_child(fin)
 
-	if is_instance_valid(lbl):
-		lbl.visible = lvl >= 2
-		lbl.text = "MAX" if lvl == MAX_TOWER_LEVEL else ("L%d" % lvl)
-		lbl.modulate = Color("#FACC15") if lvl == MAX_TOWER_LEVEL else Color("#E2E8F0")
+	if is_instance_valid(badge):
+		badge.visible = lvl >= 2
+		if lvl >= 2:
+			var b_name: String = "badge_max" if lvl >= MAX_TOWER_LEVEL else ("badge_l%d" % lvl)
+			var b_tex := _load_tex("res://assets/sprites/badges/%s.png" % b_name)
+			if b_tex:
+				badge.texture = b_tex
 
 
 func _make_mat(col: Color, emission_strength: float = 0.0, alpha: float = 1.0, metallic: float = 0.50, roughness: float = 0.36) -> StandardMaterial3D:
@@ -1210,7 +1213,7 @@ func commit_place_tower(cell: Vector2i, tower_cfg: Dictionary) -> void:
 	runtime_cfg["barrel_group"] = built["barrel_group"]
 	runtime_cfg["muzzle"] = built["muzzle"]
 	runtime_cfg["rank_group"] = built["rank_group"]
-	runtime_cfg["level_label"] = built["level_label"]
+	runtime_cfg["level_badge"] = built["level_badge"]
 	_placed_towers[cell] = runtime_cfg
 	_can_place_hover = false
 	_update_hover_visuals()
@@ -1273,15 +1276,15 @@ func _build_rotating_tower(tid: String, col: Color, on_boost: bool) -> Dictionar
 	var rank_group := Node3D.new()
 	root.add_child(rank_group)
 
-	var level_label := Label3D.new()
-	level_label.text = ""
-	level_label.font_size = 24
-	level_label.pixel_size = 0.011
-	level_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	level_label.outline_size = 4
-	level_label.position = Vector3(0.0, 1.22, 0.0)
-	level_label.visible = false
-	root.add_child(level_label)
+	var level_badge := Sprite3D.new()
+	level_badge.pixel_size = 0.0033
+	level_badge.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	level_badge.no_depth_test = true
+	level_badge.render_priority = 12
+	level_badge.shaded = false
+	level_badge.position = Vector3(0.0, 1.38, 0.0)
+	level_badge.visible = false
+	root.add_child(level_badge)
 
 	var head := Node3D.new()
 	head.position.y = 0.36
@@ -1452,7 +1455,7 @@ func _build_rotating_tower(tid: String, col: Color, on_boost: bool) -> Dictionar
 
 	return {
 		"root": root, "head": head, "barrel_group": barrel_group,
-		"muzzle": muzzle, "rank_group": rank_group, "level_label": level_label
+		"muzzle": muzzle, "rank_group": rank_group, "level_badge": level_badge
 	}
 
 
