@@ -31,6 +31,8 @@ func _ready() -> void:
 	grid_manager.tower_remove_requested.connect(_on_tower_remove_requested)
 	grid_manager.tower_inspected.connect(_on_tower_inspected)
 	grid_manager.tower_inspection_cleared.connect(_on_tower_inspection_cleared)
+	grid_manager.build_preview_changed.connect(_on_build_preview_changed)
+	grid_manager.build_preview_cleared.connect(_on_build_preview_cleared)
 	grid_manager.placement_rejected.connect(_on_placement_rejected)
 	grid_manager.enemy_killed.connect(_on_enemy_killed)
 	grid_manager.core_damaged.connect(_on_core_damaged)
@@ -53,6 +55,8 @@ func _ready() -> void:
 	ui.upgrade_inspected_requested.connect(_on_upgrade_inspected)
 	ui.sell_inspected_requested.connect(_on_sell_inspected)
 	ui.close_inspector_requested.connect(func(): grid_manager.clear_inspection())
+	ui.confirm_build_requested.connect(func(): grid_manager.confirm_pending_build())
+	ui.cancel_build_requested.connect(func(): grid_manager.clear_build_preview())
 	SettingsManager.language_changed.connect(func(_c: String): _refresh_hud())
 
 	_load_level(1)
@@ -79,6 +83,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if ke.keycode == KEY_ESCAPE:
 		if ui.is_any_overlay_open():
 			ui.close_overlays()
+		elif grid_manager.pending_build_cell != Vector2i(-1, -1):
+			grid_manager.clear_build_preview()
 		elif inspected_cell != Vector2i(-1, -1):
 			grid_manager.clear_inspection()
 		else:
@@ -121,6 +127,7 @@ func _load_level(idx: int) -> void:
 	current_level_index = idx
 	inspected_cell = Vector2i(-1, -1)
 	ui.hide_inspector()
+	ui.hide_build_preview()
 	var path: String = "res://data/levels/level_%02d.json" % idx
 	grid_manager.load_level_from_file(path)
 
@@ -164,6 +171,16 @@ func _on_tower_inspected(cell: Vector2i, info: Dictionary) -> void:
 func _on_tower_inspection_cleared() -> void:
 	inspected_cell = Vector2i(-1, -1)
 	ui.hide_inspector()
+
+
+func _on_build_preview_changed(cell: Vector2i, on_boost: bool) -> void:
+	if all_towers.has(selected_tower_id):
+		ui.show_build_preview(all_towers[selected_tower_id], gold, on_boost)
+
+
+func _on_build_preview_cleared() -> void:
+	ui.hide_build_preview()
+	ui.hide_build_preview()
 
 
 func _on_upgrade_inspected() -> void:
@@ -267,3 +284,5 @@ func _refresh_hud() -> void:
 		var info: Dictionary = grid_manager.get_inspected_tower_info(inspected_cell)
 		if not info.is_empty():
 			ui.show_inspector(info, gold)
+	if grid_manager.pending_build_cell != Vector2i(-1, -1) and all_towers.has(selected_tower_id):
+		ui.show_build_preview(all_towers[selected_tower_id], gold, grid_manager._boost_set.has(grid_manager.pending_build_cell))

@@ -95,13 +95,16 @@
       "tile_boost": "Boost Pad — grants +20% damage to tower placed here",
       "tile_tower": "Tower — defends nearby road tiles",
       "guide_controls_title": "4. Controls",
-      "guide_controls_body": "• Keys 1-6 or Bottom Panel: Select tower to build\n• Left Click / Tap: Place selected tower beside the road\n• Right Click: Sell tower (75% credits refund)\n• Space or START WAVE: Launch next enemy wave\n• < / > or [ / ]: Switch between 20 campaign levels\n• Esc: Open Settings & Language menu",
+      "guide_controls_body": "• Keys 1-6 or Bottom Panel: Select tower to build\n• Left Click / Tap (1st): Preview tower & range on cell\n• Left Click / Tap (2nd) or BUILD: Construct tower\n• Click placed tower: Upgrade (U) or Sell (X, 75% refund)\n• Right Click / Esc: Cancel preview or close inspector\n• Space or START WAVE: Launch next enemy wave",
       "btn_upgrade": "UPGRADE",
       "btn_sell": "SELL",
       "lbl_max_level": "MAX LEVEL (OVERDRIVE)",
       "lbl_lv": "Lv.",
       "msg_upgraded": "Tower upgraded!",
-      "msg_max_level": "Tower is already at MAX level!"
+      "msg_max_level": "Tower is already at MAX level!",
+      "btn_build": "BUILD",
+      "btn_cancel": "CANCEL",
+      "hint_confirm_build": "Click cell again or press BUILD"
     },
     "es": {
       "game_title": "NEON GRID DEFENSE",
@@ -174,7 +177,10 @@
       "lbl_max_level": "NIVEL MÁX (OVERDRIVE)",
       "lbl_lv": "Nv.",
       "msg_upgraded": "¡Torre mejorada!",
-      "msg_max_level": "¡La torre ya está al nivel máximo!"
+      "msg_max_level": "¡La torre ya está al nivel máximo!",
+      "btn_build": "CONSTRUIR",
+      "btn_cancel": "CANCELAR",
+      "hint_confirm_build": "Haz clic otra vez o pulsa CONSTRUIR"
     },
     "ru": {
       "game_title": "NEON GRID DEFENSE",
@@ -241,13 +247,16 @@
       "tile_boost": "Площадка Boost — даёт башне +20% к урону",
       "tile_tower": "Башня — прикрывает дорогу в своём радиусе",
       "guide_controls_title": "4. Управление",
-      "guide_controls_body": "• Клавиши 1-6 или панель внизу: Выбор башни\n• ЛКМ / Тап: Поставить башню рядом с дорогой\n• ПКМ: Продать башню (возврат 75% цены)\n• Пробел или СТАРТ ВОЛНЫ: Запустить следующую волну\n• < / > или [ / ]: Переключение 20 уровней\n• Esc: Открыть Настройки и выбор языка",
+      "guide_controls_body": "• Клавиши 1-6 или нижняя панель: выбор типа башни\n• 1-й левый клик / тап: предпросмотр башни и радиуса\n• 2-й клик по клетке или ПОСТРОИТЬ: установка башни\n• Клик по башне: меню Улучшить [U] / Продать [X] (75%)\n• Правый клик / Esc: отмена предпросмотра или закрытие меню\n• Пробел или СТАРТ ВОЛНЫ: запуск следующей волны",
       "btn_upgrade": "АПГРЕЙД",
       "btn_sell": "ПРОДАТЬ",
       "lbl_max_level": "МАКС. УРОВЕНЬ (OVERDRIVE)",
       "lbl_lv": "Ур.",
       "msg_upgraded": "Башня улучшена!",
-      "msg_max_level": "Башня уже максимального уровня!"
+      "msg_max_level": "Башня уже максимального уровня!",
+      "btn_build": "ПОСТРОИТЬ",
+      "btn_cancel": "ОТМЕНА",
+      "hint_confirm_build": "Кликните ещё раз или нажмите ПОСТРОИТЬ"
     },
     "pt": {
       "game_title": "NEON GRID DEFENSE",
@@ -320,7 +329,10 @@
       "lbl_max_level": "NÍVEL MÁX (OVERDRIVE)",
       "lbl_lv": "Nv.",
       "msg_upgraded": "Torre melhorada!",
-      "msg_max_level": "A torre já está no nível máximo!"
+      "msg_max_level": "A torre já está no nível máximo!",
+      "btn_build": "CONSTRUIR",
+      "btn_cancel": "CANCELAR",
+      "hint_confirm_build": "Clique novamente ou prima CONSTRUIR"
     },
     "fr": {
       "game_title": "NEON GRID DEFENSE",
@@ -393,7 +405,10 @@
       "lbl_max_level": "NIVEAU MAX (OVERDRIVE)",
       "lbl_lv": "Nv.",
       "msg_upgraded": "Tour améliorée !",
-      "msg_max_level": "Tour déjà au niveau maximum !"
+      "msg_max_level": "Tour déjà au niveau maximum !",
+      "btn_build": "CONSTRUIRE",
+      "btn_cancel": "ANNULER",
+      "hint_confirm_build": "Cliquez à nouveau ou sur CONSTRUIRE"
     },
     "de": {
       "game_title": "NEON GRID DEFENSE",
@@ -466,7 +481,10 @@
       "lbl_max_level": "MAX-LEVEL (OVERDRIVE)",
       "lbl_lv": "St.",
       "msg_upgraded": "Turm verbessert!",
-      "msg_max_level": "Turm ist bereits auf Max-Level!"
+      "msg_max_level": "Turm ist bereits auf Max-Level!",
+      "btn_build": "BAUEN",
+      "btn_cancel": "ABBRECHEN",
+      "hint_confirm_build": "Erneut klicken oder BAUEN drücken"
     },
     "it": {
       "game_title": "NEON GRID DEFENSE",
@@ -539,7 +557,10 @@
       "lbl_max_level": "LIVELLO MAX (OVERDRIVE)",
       "lbl_lv": "Lv.",
       "msg_upgraded": "Torre potenziata!",
-      "msg_max_level": "La torre è già al livello massimo!"
+      "msg_max_level": "La torre è già al livello massimo!",
+      "btn_build": "COSTRUISCI",
+      "btn_cancel": "ANNULLA",
+      "hint_confirm_build": "Clicca ancora o premi COSTRUISCI"
     }
   }
 }

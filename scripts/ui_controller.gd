@@ -21,6 +21,8 @@ signal tower_selected(tower_id: String)
 signal upgrade_inspected_requested()
 signal sell_inspected_requested()
 signal close_inspector_requested()
+signal confirm_build_requested()
+signal cancel_build_requested()
 signal overlay_visibility_changed(is_open: bool)
 
 var _has_started: bool = false
@@ -67,6 +69,14 @@ var _insp_btn_upgrade: Button
 var _insp_btn_sell: Button
 var _insp_btn_close: Button
 var _insp_info: Dictionary = {}
+
+# Build Preview Bar (2-click confirmation)
+var _preview_panel: PanelContainer
+var _prev_icon: TextureRect
+var _prev_title: Label
+var _prev_hint: Label
+var _prev_btn_build: Button
+var _prev_btn_cancel: Button
 
 # Overlays
 var _backdrop: ColorRect
@@ -130,6 +140,7 @@ func _ready() -> void:
 	_build_hud()
 	_build_tower_shop()
 	_build_inspector()
+	_build_preview_bar()
 	_build_overlays()
 	SettingsManager.language_changed.connect(_on_language_changed)
 	_apply_translations()
@@ -596,6 +607,81 @@ func hide_inspector() -> void:
 	_insp_info.clear()
 	if _inspector_panel:
 		_inspector_panel.visible = false
+
+
+func _build_preview_bar() -> void:
+	_preview_panel = PanelContainer.new()
+	_preview_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_preview_panel.offset_left = -330.0
+	_preview_panel.offset_right = 330.0
+	_preview_panel.offset_top = -202.0
+	_preview_panel.offset_bottom = -130.0
+	_preview_panel.add_theme_stylebox_override("panel", _make_panel_style(Color("#0F172A"), Color("#00E5FF"), 10, 2))
+	_preview_panel.visible = false
+	add_child(_preview_panel)
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	_preview_panel.add_child(row)
+
+	_prev_icon = TextureRect.new()
+	_prev_icon.custom_minimum_size = Vector2(46, 46)
+	_prev_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_prev_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	row.add_child(_prev_icon)
+
+	var info_v := VBoxContainer.new()
+	info_v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_v.add_theme_constant_override("separation", 2)
+	row.add_child(info_v)
+
+	_prev_title = Label.new()
+	_prev_title.add_theme_font_size_override("font_size", 14)
+	_prev_title.add_theme_color_override("font_color", Color("#00E5FF"))
+	info_v.add_child(_prev_title)
+
+	_prev_hint = Label.new()
+	_prev_hint.add_theme_font_size_override("font_size", 12)
+	_prev_hint.add_theme_color_override("font_color", Color("#E2E8F0"))
+	info_v.add_child(_prev_hint)
+
+	_prev_btn_build = Button.new()
+	_prev_btn_build.custom_minimum_size = Vector2(150, 42)
+	_prev_btn_build.pressed.connect(func(): confirm_build_requested.emit())
+	row.add_child(_prev_btn_build)
+
+	_prev_btn_cancel = Button.new()
+	_prev_btn_cancel.custom_minimum_size = Vector2(105, 42)
+	_style_button(_prev_btn_cancel, Color("#94A3B8"), true)
+	_prev_btn_cancel.pressed.connect(func(): cancel_build_requested.emit())
+	row.add_child(_prev_btn_cancel)
+
+
+func show_build_preview(cfg: Dictionary, gold: int, on_boost: bool) -> void:
+	if not _preview_panel or cfg.is_empty():
+		return
+	_preview_panel.visible = true
+	var tid: String = str(cfg.get("id", "pulse"))
+	var ip: String = "res://assets/sprites/towers/%s.png" % tid
+	if ResourceLoader.exists(ip):
+		_prev_icon.texture = load(ip)
+	var boost_tag: String = "  [+20% BOOST]" if on_boost else ""
+	_prev_title.text = "%s%s" % [str(cfg.get("name", tid)), boost_tag]
+	_prev_title.add_theme_color_override("font_color", Color("#10B981") if on_boost else Color("#00E5FF"))
+	_prev_hint.text = SettingsManager.tr_key("hint_confirm_build")
+	var cost: int = int(cfg.get("cost", 25))
+	var cost_l: String = SettingsManager.tr_key("stat_cost")
+	var can_aff: bool = gold >= cost
+	_prev_btn_build.disabled = not can_aff
+	_prev_btn_build.text = "%s
+-%d %s" % [SettingsManager.tr_key("btn_build"), cost, cost_l]
+	_style_button(_prev_btn_build, Color("#10B981"), can_aff, not can_aff)
+	_prev_btn_cancel.text = SettingsManager.tr_key("btn_cancel")
+
+
+func hide_build_preview() -> void:
+	if _preview_panel:
+		_preview_panel.visible = false
 
 
 func _build_overlays() -> void:

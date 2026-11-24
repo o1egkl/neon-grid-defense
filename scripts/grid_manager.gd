@@ -9,6 +9,8 @@ signal tower_place_requested(cell: Vector2i, on_boost: bool)
 signal tower_remove_requested(cell: Vector2i, refund: int)
 signal tower_inspected(cell: Vector2i, info: Dictionary)
 signal tower_inspection_cleared()
+signal build_preview_changed(cell: Vector2i, on_boost: bool)
+signal build_preview_cleared()
 signal placement_rejected(cell: Vector2i, reason_key: String)
 signal level_loaded(level_data: Dictionary)
 signal enemy_killed(bounty: int)
@@ -38,6 +40,8 @@ var boost_tiles: Array[Vector2i] = []
 var input_enabled: bool = false
 var selected_tower_config: Dictionary = {}
 var inspected_cell := Vector2i(-1, -1)
+var pending_build_cell := Vector2i(-1, -1)
+var _ghost_root: Node3D = null
 var game_speed: float = 1.0
 var cores_remaining: int = 10
 
@@ -258,7 +262,54 @@ func _on_settings_changed() -> void:
 func set_selected_tower(tower_cfg: Dictionary) -> void:
 	selected_tower_config = tower_cfg
 	clear_inspection()
+	if pending_build_cell != Vector2i(-1, -1):
+		_spawn_build_ghost(pending_build_cell)
+		build_preview_changed.emit(pending_build_cell, _boost_set.has(pending_build_cell))
 	_update_hover_visuals()
+
+
+func clear_build_preview() -> void:
+	if is_instance_valid(_ghost_root):
+		_ghost_root.queue_free()
+	_ghost_root = null
+	if pending_build_cell != Vector2i(-1, -1):
+		pending_build_cell = Vector2i(-1, -1)
+		_update_hover_visuals()
+		build_preview_cleared.emit()
+
+
+func confirm_pending_build() -> void:
+	if pending_build_cell != Vector2i(-1, -1) and _is_buildable_cell(pending_build_cell):
+		tower_place_requested.emit(pending_build_cell, _boost_set.has(pending_build_cell))
+
+
+func _spawn_build_ghost(cell: Vector2i) -> void:
+	if is_instance_valid(_ghost_root):
+		_ghost_root.queue_free()
+	_ghost_root = null
+	if selected_tower_config.is_empty() or not _is_buildable_cell(cell):
+		return
+	var tid: String = str(selected_tower_config.get("id", "pulse"))
+	var col := Color(str(selected_tower_config.get("color", "#00E5FF")))
+	var built: Dictionary = _build_rotating_tower(tid, col, _boost_set.has(cell))
+	_ghost_root = built["root"]
+	var pos: Vector3 = cell_to_world_3d(cell)
+	_ghost_root.position = pos
+	var head_node: Node3D = built["head"]
+	if is_instance_valid(head_node):
+		head_node.rotation.y = _get_nearest_road_yaw(pos)
+	_make_node_ghost(_ghost_root, col)
+	_towers_root.add_child(_ghost_root)
+
+
+func _make_node_ghost(node: Node, tint: Color) -> void:
+	if node is MeshInstance3D:
+		var mi: MeshInstance3D = node
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var gmat := _make_mat(tint, 1.35, 0.52, 0.2, 0.25)
+		mi.material_override = gmat
+	for c in node.get_children():
+		_make_node_ghost(c, tint)
 
 
 func clear_inspection() -> void:
@@ -484,6 +535,10 @@ func load_level_from_file(path: String) -> bool:
 
 	_hover_cell = Vector2i(-1, -1)
 	inspected_cell = Vector2i(-1, -1)
+	pending_build_cell = Vector2i(-1, -1)
+	if is_instance_valid(_ghost_root):
+		_ghost_root.queue_free()
+	_ghost_root = null
 	_hover_box.visible = false
 	_range_ring.visible = false
 	_next_range_ring.visible = false
@@ -965,6 +1020,24 @@ func _update_hover_visuals() -> void:
 		return
 
 	_next_range_ring.visible = false
+	if pending_build_cell != Vector2i(-1, -1) and _is_buildable_cell(pending_build_cell):
+		var ppos: Vector3 = cell_to_world_3d(pending_build_cell)
+		var pcol := Color("#10B981") if _boost_set.has(pending_build_cell) else Color(str(selected_tower_config.get("color", "#00E5FF")))
+		_hover_box.visible = true
+		_hover_box.position = Vector3(ppos.x, 0.06, ppos.z)
+		_hover_mat.albedo_color = Color(pcol.r, pcol.g, pcol.b, 0.45)
+		_hover_mat.emission = pcol
+		if not selected_tower_config.is_empty():
+			var prng: float = float(selected_tower_config.get("range", 180.0)) * PX_TO_WORLD
+			_range_ring.visible = true
+			_range_ring.position = Vector3(ppos.x, 0.08, ppos.z)
+			_range_ring.scale = Vector3(prng, 1.0, prng)
+			_range_mat.albedo_color = Color(pcol.r, pcol.g, pcol.b, 0.72)
+			_range_mat.emission = pcol
+		else:
+			_range_ring.visible = false
+		return
+
 	if not _cells.has(_hover_cell):
 		_hover_box.visible = false
 		_range_ring.visible = false
@@ -997,8 +1070,9 @@ func _is_buildable_cell(cell: Vector2i) -> bool:
 
 func _handle_left_click(cell: Vector2i) -> void:
 	var t: int = int(_cells.get(cell, -1))
-	# Клик по уже стоящей башне открывает инспектор апгрейда
+	# Клик по уже стоящей башне открывает инспектор (и убирает предпросмотр постройки)
 	if t == CellType.TOWER and _placed_towers.has(cell):
+		clear_build_preview()
 		inspected_cell = cell
 		_update_hover_visuals()
 		tower_inspected.emit(cell, get_inspected_tower_info(cell))
@@ -1008,21 +1082,30 @@ func _handle_left_click(cell: Vector2i) -> void:
 		clear_inspection()
 
 	if t == CellType.PATH or t == CellType.SPAWN or t == CellType.CORE:
+		clear_build_preview()
 		placement_rejected.emit(cell, "msg_on_road")
 		return
 	if not _is_buildable_cell(cell):
+		clear_build_preview()
 		placement_rejected.emit(cell, "msg_occupied")
 		return
-	tower_place_requested.emit(cell, _boost_set.has(cell))
+
+	# Повторный клик по той же клетке подтверждает постройку башни
+	if cell == pending_build_cell:
+		tower_place_requested.emit(cell, _boost_set.has(cell))
+	else:
+		pending_build_cell = cell
+		_spawn_build_ghost(cell)
+		_update_hover_visuals()
+		build_preview_changed.emit(cell, _boost_set.has(cell))
 
 
-func _handle_right_click(cell: Vector2i) -> void:
-	if int(_cells.get(cell, -1)) != CellType.TOWER:
+func _handle_right_click(_cell: Vector2i) -> void:
+	# ПКМ больше не продаёт башню — только отменяет предпросмотр или закрывает инспектор
+	if pending_build_cell != Vector2i(-1, -1):
+		clear_build_preview()
+	elif inspected_cell != Vector2i(-1, -1):
 		clear_inspection()
-		return
-	var t: Dictionary = _placed_towers.get(cell, {})
-	var refund: int = get_sell_refund(t)
-	tower_remove_requested.emit(cell, refund)
 
 
 func _get_nearest_road_yaw(world_pos: Vector3) -> float:
@@ -1041,6 +1124,7 @@ func _get_nearest_road_yaw(world_pos: Vector3) -> float:
 
 
 func commit_place_tower(cell: Vector2i, tower_cfg: Dictionary) -> void:
+	clear_build_preview()
 	_cells[cell] = CellType.TOWER
 	var tid: String = str(tower_cfg.get("id", "pulse"))
 	var col := Color(str(tower_cfg.get("color", "#3B82F6")))
