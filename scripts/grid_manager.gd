@@ -1545,6 +1545,8 @@ func _process(delta: float) -> void:
 		_process_towers(dt)
 		_process_projectiles(dt)
 		_check_wave_completion()
+	elif not _ended and not _projectiles.is_empty():
+		_process_projectiles(dt)
 
 	_process_vfx(delta)
 	_process_float_texts(delta)
@@ -2322,9 +2324,18 @@ func _process_float_texts(delta: float) -> void:
 		i -= 1
 
 
+func _clear_projectiles() -> void:
+	for p in _projectiles:
+		var node: Node3D = p.get("node", null)
+		if is_instance_valid(node):
+			node.queue_free()
+	_projectiles.clear()
+
+
 func _check_wave_completion() -> void:
 	if _spawn_queue.is_empty() and _enemies.is_empty() and _wave_active:
 		_wave_active = false
+		_clear_projectiles()
 		var w_data: Dictionary = _waves_data[_current_wave_idx]
 		var bonus: int = int(w_data.get("bonus_gold", 20))
 		wave_cleared.emit(bonus)
