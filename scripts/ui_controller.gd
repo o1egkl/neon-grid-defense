@@ -60,9 +60,12 @@ var _hud_btn_settings: Button
 var _shop_bar: PanelContainer
 var _shop_title_label: Label
 var _shop_cards_box: HBoxContainer
+var _shop_scroll: ScrollContainer
 
 # Tower Inspector Bar (for 5-level upgrades)
 var _inspector_panel: PanelContainer
+var _insp_flow: HFlowContainer
+var _insp_info_box: HBoxContainer
 var _insp_icon: TextureRect
 var _insp_title: Label
 var _insp_stats: Label
@@ -73,6 +76,8 @@ var _insp_info: Dictionary = {}
 
 # Build Preview Bar (2-click confirmation)
 var _preview_panel: PanelContainer
+var _prev_flow: HFlowContainer
+var _prev_info_box: HBoxContainer
 var _prev_icon: TextureRect
 var _prev_title: Label
 var _prev_hint: Label
@@ -101,6 +106,7 @@ var _lbl_levels_diff_desc: Label
 var _lbl_master: Label
 var _lbl_sfx: Label
 var _lbl_music: Label
+var _slider_labels: Array[Label] = []
 var _val_master: Label
 var _val_sfx: Label
 var _val_music: Label
@@ -120,6 +126,9 @@ var _btn_new_game: Button
 
 # Guide controls
 var _lbl_guide_title: Label
+var _guide_lang_buttons: Dictionary = {}
+var _lbl_welcome_title: Label
+var _lbl_welcome_body: Label
 var _lbl_goal_t: Label
 var _lbl_goal_b: Label
 var _lbl_maze_t: Label
@@ -160,9 +169,14 @@ func _ready() -> void:
 	SettingsManager.language_changed.connect(_on_language_changed)
 	SettingsManager.difficulty_changed.connect(func(_d: String): _sync_difficulty_ui())
 	get_viewport().size_changed.connect(_on_viewport_resized)
+	_hud_bar.resized.connect(func(): call_deferred("_update_dynamic_bars"))
+	_shop_bar.resized.connect(func(): call_deferred("_update_dynamic_bars"))
 	call_deferred("_on_viewport_resized")
 	_apply_translations()
-	show_settings()
+	if not SettingsManager.intro_seen:
+		show_guide()
+	else:
+		show_settings()
 
 
 func _load_campaign_index() -> void:
@@ -228,6 +242,7 @@ func show_result(is_victory: bool) -> void:
 
 func close_overlays() -> void:
 	_has_started = true
+	SettingsManager.mark_intro_seen()
 	_backdrop.visible = false
 	_settings_panel.visible = false
 	_guide_panel.visible = false
@@ -396,7 +411,9 @@ func _build_hud() -> void:
 	_hud_bar.add_child(hbox)
 
 	_btn_level_pill = Button.new()
-	_btn_level_pill.custom_minimum_size = Vector2(140, 32)
+	_btn_level_pill.custom_minimum_size = Vector2(130, 32)
+	_btn_level_pill.clip_text = true
+	_btn_level_pill.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_btn_level_pill.add_theme_font_size_override("font_size", 13)
 	_btn_level_pill.add_theme_color_override("font_color", Color("#E0F7FA"))
 	_btn_level_pill.add_theme_color_override("font_hover_color", Color("#FFFFFF"))
@@ -426,19 +443,24 @@ func _build_hud() -> void:
 
 	_status_toast = PanelContainer.new()
 	_status_toast.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_status_toast.grow_vertical = Control.GROW_DIRECTION_END
 	_status_toast.offset_left = -260.0
 	_status_toast.offset_right = 260.0
 	_status_toast.offset_top = 52.0
-	_status_toast.offset_bottom = 78.0
+	_status_toast.offset_bottom = 52.0
 	_status_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var toast_sb := _make_panel_style(Color(0.05, 0.08, 0.14, 0.78), Color("#1E293B"), 10, 1)
-	toast_sb.content_margin_top = 2
-	toast_sb.content_margin_bottom = 2
+	var toast_sb := _make_panel_style(Color(0.05, 0.08, 0.14, 0.86), Color("#1E293B"), 10, 1)
+	toast_sb.content_margin_top = 4
+	toast_sb.content_margin_bottom = 4
+	toast_sb.content_margin_left = 10
+	toast_sb.content_margin_right = 10
 	_status_toast.add_theme_stylebox_override("panel", toast_sb)
 	add_child(_status_toast)
 
 	_hud_status_label = Label.new()
 	_hud_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hud_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_hud_status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_hud_status_label.add_theme_color_override("font_color", Color("#CBD5E1"))
 	_hud_status_label.add_theme_font_size_override("font_size", 12)
 	_status_toast.add_child(_hud_status_label)
@@ -491,34 +513,41 @@ func _build_hud() -> void:
 func _build_tower_shop() -> void:
 	_shop_bar = PanelContainer.new()
 	_shop_bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_shop_bar.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_shop_bar.offset_top = -124.0
+	_shop_bar.offset_bottom = 0.0
 	var shop_style := _make_panel_style(Color("#0D1321"), Color("#1E293B"), 0, 1)
 	shop_style.content_margin_top = 6
 	shop_style.content_margin_bottom = 8
+	shop_style.content_margin_left = 10
+	shop_style.content_margin_right = 10
 	_shop_bar.add_theme_stylebox_override("panel", shop_style)
 	add_child(_shop_bar)
 
 	var vbox := VBoxContainer.new()
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	vbox.add_theme_constant_override("separation", 6)
 	_shop_bar.add_child(vbox)
 
 	_shop_title_label = Label.new()
 	_shop_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_shop_title_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_shop_title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_shop_title_label.add_theme_font_size_override("font_size", 12)
 	_shop_title_label.add_theme_color_override("font_color", Color("#94A3B8"))
 	vbox.add_child(_shop_title_label)
 
-	var shop_scroll := ScrollContainer.new()
-	shop_scroll.custom_minimum_size = Vector2(0, 92)
-	shop_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	shop_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	vbox.add_child(shop_scroll)
+	_shop_scroll = ScrollContainer.new()
+	_shop_scroll.custom_minimum_size = Vector2(0, 96)
+	_shop_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_shop_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vbox.add_child(_shop_scroll)
 
 	_shop_cards_box = HBoxContainer.new()
 	_shop_cards_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_shop_cards_box.alignment = BoxContainer.ALIGNMENT_CENTER
 	_shop_cards_box.add_theme_constant_override("separation", 8)
-	shop_scroll.add_child(_shop_cards_box)
+	_shop_scroll.add_child(_shop_cards_box)
 
 
 func _rebuild_tower_shop_cards() -> void:
@@ -547,12 +576,15 @@ func _rebuild_tower_shop_cards() -> void:
 		var is_sel: bool = (tid == _selected_tower_id)
 
 		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(242, 88)
+		btn.custom_minimum_size = Vector2(262, 92)
 		btn.expand_icon = true
+		btn.clip_text = true
+		btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		btn.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		var icon_path: String = "res://assets/sprites/towers/%s.png" % tid
 		if ResourceLoader.exists(icon_path):
 			btn.icon = load(icon_path)
-			btn.add_theme_constant_override("icon_max_width", 56)
+			btn.add_theme_constant_override("icon_max_width", 52)
 		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		btn.add_theme_font_size_override("font_size", 12)
 		btn.text = "[%d] %s  —  %d %s\n%s: %d | %s: %d | %s: %.1f/s\n%s" % [
@@ -568,56 +600,74 @@ func _rebuild_tower_shop_cards() -> void:
 func _build_inspector() -> void:
 	_inspector_panel = PanelContainer.new()
 	_inspector_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_inspector_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_inspector_panel.offset_left = -360.0
 	_inspector_panel.offset_right = 360.0
-	_inspector_panel.offset_top = -202.0
-	_inspector_panel.offset_bottom = -130.0
+	_inspector_panel.offset_top = -134.0
+	_inspector_panel.offset_bottom = -134.0
 	_inspector_panel.add_theme_stylebox_override("panel", _make_panel_style(Color("#0F172A"), Color("#FACC15"), 10, 2))
 	_inspector_panel.visible = false
 	add_child(_inspector_panel)
 
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	_inspector_panel.add_child(row)
+	_insp_flow = HFlowContainer.new()
+	_insp_flow.alignment = FlowContainer.ALIGNMENT_CENTER
+	_insp_flow.add_theme_constant_override("h_separation", 10)
+	_insp_flow.add_theme_constant_override("v_separation", 8)
+	_inspector_panel.add_child(_insp_flow)
+
+	_insp_info_box = HBoxContainer.new()
+	_insp_info_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_insp_info_box.add_theme_constant_override("separation", 10)
+	_insp_flow.add_child(_insp_info_box)
 
 	_insp_icon = TextureRect.new()
-	_insp_icon.custom_minimum_size = Vector2(46, 46)
+	_insp_icon.custom_minimum_size = Vector2(44, 44)
 	_insp_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_insp_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	row.add_child(_insp_icon)
+	_insp_info_box.add_child(_insp_icon)
 
 	var info_v := VBoxContainer.new()
 	info_v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info_v.add_theme_constant_override("separation", 2)
-	row.add_child(info_v)
+	_insp_info_box.add_child(info_v)
 
 	_insp_title = Label.new()
+	_insp_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_insp_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_insp_title.add_theme_font_size_override("font_size", 14)
 	_insp_title.add_theme_color_override("font_color", Color("#FACC15"))
 	info_v.add_child(_insp_title)
 
 	_insp_stats = Label.new()
+	_insp_stats.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_insp_stats.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_insp_stats.add_theme_font_size_override("font_size", 12)
 	_insp_stats.add_theme_color_override("font_color", Color("#E2E8F0"))
 	info_v.add_child(_insp_stats)
 
+	var btns := HBoxContainer.new()
+	btns.add_theme_constant_override("separation", 8)
+	_insp_flow.add_child(btns)
+
 	_insp_btn_upgrade = Button.new()
-	_insp_btn_upgrade.custom_minimum_size = Vector2(150, 42)
+	_insp_btn_upgrade.custom_minimum_size = Vector2(138, 42)
+	_insp_btn_upgrade.clip_text = true
 	_insp_btn_upgrade.pressed.connect(func(): upgrade_inspected_requested.emit())
-	row.add_child(_insp_btn_upgrade)
+	btns.add_child(_insp_btn_upgrade)
 
 	_insp_btn_sell = Button.new()
-	_insp_btn_sell.custom_minimum_size = Vector2(118, 42)
+	_insp_btn_sell.custom_minimum_size = Vector2(110, 42)
+	_insp_btn_sell.clip_text = true
 	_style_button(_insp_btn_sell, Color("#EF4444"), true)
 	_insp_btn_sell.pressed.connect(func(): sell_inspected_requested.emit())
-	row.add_child(_insp_btn_sell)
+	btns.add_child(_insp_btn_sell)
 
 	_insp_btn_close = Button.new()
 	_insp_btn_close.text = "X"
-	_insp_btn_close.custom_minimum_size = Vector2(32, 32)
+	_insp_btn_close.custom_minimum_size = Vector2(34, 42)
 	_style_button(_insp_btn_close, Color("#94A3B8"))
 	_insp_btn_close.pressed.connect(func(): close_inspector_requested.emit())
-	row.add_child(_insp_btn_close)
+	btns.add_child(_insp_btn_close)
 
 
 func show_inspector(info: Dictionary, gold: int) -> void:
@@ -677,49 +727,67 @@ func hide_inspector() -> void:
 func _build_preview_bar() -> void:
 	_preview_panel = PanelContainer.new()
 	_preview_panel.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	_preview_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_preview_panel.offset_left = -330.0
 	_preview_panel.offset_right = 330.0
-	_preview_panel.offset_top = -202.0
-	_preview_panel.offset_bottom = -130.0
+	_preview_panel.offset_top = -134.0
+	_preview_panel.offset_bottom = -134.0
 	_preview_panel.add_theme_stylebox_override("panel", _make_panel_style(Color("#0F172A"), Color("#00E5FF"), 10, 2))
 	_preview_panel.visible = false
 	add_child(_preview_panel)
 
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	_preview_panel.add_child(row)
+	_prev_flow = HFlowContainer.new()
+	_prev_flow.alignment = FlowContainer.ALIGNMENT_CENTER
+	_prev_flow.add_theme_constant_override("h_separation", 10)
+	_prev_flow.add_theme_constant_override("v_separation", 8)
+	_preview_panel.add_child(_prev_flow)
+
+	_prev_info_box = HBoxContainer.new()
+	_prev_info_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_prev_info_box.add_theme_constant_override("separation", 10)
+	_prev_flow.add_child(_prev_info_box)
 
 	_prev_icon = TextureRect.new()
-	_prev_icon.custom_minimum_size = Vector2(46, 46)
+	_prev_icon.custom_minimum_size = Vector2(44, 44)
 	_prev_icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_prev_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	row.add_child(_prev_icon)
+	_prev_info_box.add_child(_prev_icon)
 
 	var info_v := VBoxContainer.new()
 	info_v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info_v.add_theme_constant_override("separation", 2)
-	row.add_child(info_v)
+	_prev_info_box.add_child(info_v)
 
 	_prev_title = Label.new()
+	_prev_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_prev_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_prev_title.add_theme_font_size_override("font_size", 14)
 	_prev_title.add_theme_color_override("font_color", Color("#00E5FF"))
 	info_v.add_child(_prev_title)
 
 	_prev_hint = Label.new()
+	_prev_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_prev_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_prev_hint.add_theme_font_size_override("font_size", 12)
 	_prev_hint.add_theme_color_override("font_color", Color("#E2E8F0"))
 	info_v.add_child(_prev_hint)
 
+	var btns := HBoxContainer.new()
+	btns.add_theme_constant_override("separation", 8)
+	_prev_flow.add_child(btns)
+
 	_prev_btn_build = Button.new()
-	_prev_btn_build.custom_minimum_size = Vector2(150, 42)
+	_prev_btn_build.custom_minimum_size = Vector2(138, 42)
+	_prev_btn_build.clip_text = true
 	_prev_btn_build.pressed.connect(func(): confirm_build_requested.emit())
-	row.add_child(_prev_btn_build)
+	btns.add_child(_prev_btn_build)
 
 	_prev_btn_cancel = Button.new()
-	_prev_btn_cancel.custom_minimum_size = Vector2(105, 42)
+	_prev_btn_cancel.custom_minimum_size = Vector2(102, 42)
+	_prev_btn_cancel.clip_text = true
 	_style_button(_prev_btn_cancel, Color("#94A3B8"), true)
 	_prev_btn_cancel.pressed.connect(func(): cancel_build_requested.emit())
-	row.add_child(_prev_btn_cancel)
+	btns.add_child(_prev_btn_cancel)
 
 
 func show_build_preview(cfg: Dictionary, gold: int, on_boost: bool) -> void:
@@ -770,14 +838,18 @@ func _build_overlays() -> void:
 func _build_settings_panel(parent: Control) -> void:
 	_settings_panel = PanelContainer.new()
 	_settings_panel.custom_minimum_size = Vector2(760, 590)
+	_settings_panel.clip_contents = true
 	_settings_panel.add_theme_stylebox_override("panel", _make_panel_style(Color("#0F172A"), Color("#00E5FF"), 12, 2))
 	parent.add_child(_settings_panel)
 
 	var outer_v := VBoxContainer.new()
+	outer_v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	outer_v.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	outer_v.add_theme_constant_override("separation", 8)
 	_settings_panel.add_child(outer_v)
 
 	var s_scroll := ScrollContainer.new()
+	s_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	s_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	s_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	outer_v.add_child(s_scroll)
@@ -789,12 +861,16 @@ func _build_settings_panel(parent: Control) -> void:
 
 	_lbl_game_title = Label.new()
 	_lbl_game_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lbl_game_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_lbl_game_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_lbl_game_title.add_theme_font_size_override("font_size", 28)
 	_lbl_game_title.add_theme_color_override("font_color", Color("#00E5FF"))
 	vbox.add_child(_lbl_game_title)
 
 	_lbl_subtitle = Label.new()
 	_lbl_subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lbl_subtitle.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_lbl_subtitle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_lbl_subtitle.add_theme_font_size_override("font_size", 14)
 	_lbl_subtitle.add_theme_color_override("font_color", Color("#94A3B8"))
 	vbox.add_child(_lbl_subtitle)
@@ -802,11 +878,15 @@ func _build_settings_panel(parent: Control) -> void:
 	vbox.add_child(HSeparator.new())
 
 	_lbl_settings_title = Label.new()
+	_lbl_settings_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_lbl_settings_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_lbl_settings_title.add_theme_font_size_override("font_size", 18)
 	_lbl_settings_title.add_theme_color_override("font_color", Color("#F8FAFC"))
 	vbox.add_child(_lbl_settings_title)
 
 	_lbl_lang = Label.new()
+	_lbl_lang.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_lbl_lang.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_lbl_lang.add_theme_color_override("font_color", Color("#CBD5E1"))
 	vbox.add_child(_lbl_lang)
 
@@ -828,6 +908,8 @@ func _build_settings_panel(parent: Control) -> void:
 		_lang_buttons[code] = b
 
 	_lbl_diff_title = Label.new()
+	_lbl_diff_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_lbl_diff_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_lbl_diff_title.add_theme_color_override("font_color", Color("#CBD5E1"))
 	vbox.add_child(_lbl_diff_title)
 
@@ -841,7 +923,8 @@ func _build_settings_panel(parent: Control) -> void:
 		var did: String = d_cfg[0]
 		var dcol := Color(d_cfg[1])
 		var db := Button.new()
-		db.custom_minimum_size = Vector2(180, 34)
+		db.custom_minimum_size = Vector2(140, 34)
+		db.clip_text = true
 		_style_button(db, dcol)
 		db.pressed.connect(func(): SettingsManager.set_difficulty(did))
 		diff_row.add_child(db)
@@ -849,6 +932,8 @@ func _build_settings_panel(parent: Control) -> void:
 
 	_lbl_diff_desc = Label.new()
 	_lbl_diff_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lbl_diff_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_lbl_diff_desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_lbl_diff_desc.add_theme_font_size_override("font_size", 12)
 	_lbl_diff_desc.add_theme_color_override("font_color", Color("#94A3B8"))
 	vbox.add_child(_lbl_diff_desc)
@@ -900,8 +985,10 @@ func _build_settings_panel(parent: Control) -> void:
 	_chk_grid.toggled.connect(func(on: bool): SettingsManager.set_show_grid_lines(on))
 	toggles.add_child(_chk_grid)
 
-	var speed_row := HBoxContainer.new()
-	speed_row.add_theme_constant_override("separation", 10)
+	var speed_row := HFlowContainer.new()
+	speed_row.alignment = FlowContainer.ALIGNMENT_CENTER
+	speed_row.add_theme_constant_override("h_separation", 10)
+	speed_row.add_theme_constant_override("v_separation", 6)
 	vbox.add_child(speed_row)
 
 	_lbl_speed = Label.new()
@@ -921,9 +1008,12 @@ func _build_settings_panel(parent: Control) -> void:
 		_speed_buttons.append(sb)
 
 	_lbl_speed_hint = Label.new()
+	_lbl_speed_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lbl_speed_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_lbl_speed_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_lbl_speed_hint.add_theme_font_size_override("font_size", 11)
 	_lbl_speed_hint.add_theme_color_override("font_color", Color("#94A3B8"))
-	speed_row.add_child(_lbl_speed_hint)
+	vbox.add_child(_lbl_speed_hint)
 
 	var sp := Control.new()
 	sp.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -936,25 +1026,29 @@ func _build_settings_panel(parent: Control) -> void:
 	outer_v.add_child(actions)
 
 	_btn_open_guide = Button.new()
-	_btn_open_guide.custom_minimum_size = Vector2(180, 44)
+	_btn_open_guide.custom_minimum_size = Vector2(150, 42)
+	_btn_open_guide.clip_text = true
 	_style_button(_btn_open_guide, Color("#10B981"), true)
 	_btn_open_guide.pressed.connect(show_guide)
 	actions.add_child(_btn_open_guide)
 
 	_btn_open_levels = Button.new()
-	_btn_open_levels.custom_minimum_size = Vector2(160, 44)
+	_btn_open_levels.custom_minimum_size = Vector2(145, 42)
+	_btn_open_levels.clip_text = true
 	_style_button(_btn_open_levels, Color("#3B82F6"), true)
 	_btn_open_levels.pressed.connect(show_levels)
 	actions.add_child(_btn_open_levels)
 
 	_btn_new_game = Button.new()
-	_btn_new_game.custom_minimum_size = Vector2(150, 44)
+	_btn_new_game.custom_minimum_size = Vector2(140, 42)
+	_btn_new_game.clip_text = true
 	_style_button(_btn_new_game, Color("#EF4444"))
 	_btn_new_game.pressed.connect(show_confirm_new_game)
 	actions.add_child(_btn_new_game)
 
 	_btn_play = Button.new()
-	_btn_play.custom_minimum_size = Vector2(180, 44)
+	_btn_play.custom_minimum_size = Vector2(155, 42)
+	_btn_play.clip_text = true
 	_style_button(_btn_play, Color("#00E5FF"), true)
 	_btn_play.pressed.connect(close_overlays)
 	actions.add_child(_btn_play)
@@ -962,13 +1056,16 @@ func _build_settings_panel(parent: Control) -> void:
 
 func _make_slider_row(parent: Control) -> Array:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 10)
 	parent.add_child(row)
 
 	var lbl := Label.new()
-	lbl.custom_minimum_size = Vector2(190, 0)
+	lbl.custom_minimum_size = Vector2(155, 0)
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lbl.add_theme_color_override("font_color", Color("#CBD5E1"))
 	row.add_child(lbl)
+	_slider_labels.append(lbl)
 
 	var slider := HSlider.new()
 	slider.min_value = 0
@@ -989,27 +1086,70 @@ func _make_slider_row(parent: Control) -> Array:
 func _build_guide_panel(parent: Control) -> void:
 	_guide_panel = PanelContainer.new()
 	_guide_panel.custom_minimum_size = Vector2(780, 600)
+	_guide_panel.clip_contents = true
 	_guide_panel.add_theme_stylebox_override("panel", _make_panel_style(Color("#0F172A"), Color("#10B981"), 12, 2))
 	parent.add_child(_guide_panel)
 
 	var root_v := VBoxContainer.new()
+	root_v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	root_v.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root_v.add_theme_constant_override("separation", 10)
 	_guide_panel.add_child(root_v)
 
 	_lbl_guide_title = Label.new()
 	_lbl_guide_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lbl_guide_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_lbl_guide_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_lbl_guide_title.add_theme_font_size_override("font_size", 24)
 	_lbl_guide_title.add_theme_color_override("font_color", Color("#10B981"))
 	root_v.add_child(_lbl_guide_title)
 
+	var lang_bar := HFlowContainer.new()
+	lang_bar.alignment = FlowContainer.ALIGNMENT_CENTER
+	lang_bar.add_theme_constant_override("h_separation", 6)
+	lang_bar.add_theme_constant_override("v_separation", 4)
+	root_v.add_child(lang_bar)
+	for lang in SettingsManager.languages:
+		var code: String = str(lang.get("code", "en"))
+		var lb := Button.new()
+		lb.text = str(lang.get("name", code.to_upper()))
+		lb.custom_minimum_size = Vector2(78, 28)
+		lb.add_theme_font_size_override("font_size", 11)
+		_style_button(lb, Color("#00E5FF"))
+		lb.pressed.connect(func(): SettingsManager.set_language(code))
+		lang_bar.add_child(lb)
+		_guide_lang_buttons[code] = lb
+
 	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	root_v.add_child(scroll)
 
 	var content := VBoxContainer.new()
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_theme_constant_override("separation", 10)
 	scroll.add_child(content)
+
+	var welcome_card := PanelContainer.new()
+	welcome_card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	welcome_card.add_theme_stylebox_override("panel", _make_panel_style(Color("#07221B"), Color("#10B981"), 10, 2))
+	content.add_child(welcome_card)
+
+	var welcome_v := VBoxContainer.new()
+	welcome_v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	welcome_v.add_theme_constant_override("separation", 6)
+	welcome_card.add_child(welcome_v)
+
+	_lbl_welcome_title = Label.new()
+	_lbl_welcome_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_lbl_welcome_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_lbl_welcome_title.add_theme_font_size_override("font_size", 15)
+	_lbl_welcome_title.add_theme_color_override("font_color", Color("#6EE7B7"))
+	welcome_v.add_child(_lbl_welcome_title)
+
+	_lbl_welcome_body = _make_body_label(welcome_v)
+	_lbl_welcome_body.add_theme_color_override("font_color", Color("#ECFDF5"))
 
 	_lbl_goal_t = _make_section_heading(content)
 	_lbl_goal_b = _make_body_label(content)
@@ -1029,6 +1169,7 @@ func _build_guide_panel(parent: Control) -> void:
 	]
 	for item in legend_items:
 		var row := HBoxContainer.new()
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_theme_constant_override("separation", 10)
 		content.add_child(row)
 
@@ -1047,19 +1188,22 @@ func _build_guide_panel(parent: Control) -> void:
 	_lbl_ctrl_t = _make_section_heading(content)
 	_lbl_ctrl_b = _make_body_label(content)
 
-	var btns := HBoxContainer.new()
-	btns.alignment = BoxContainer.ALIGNMENT_CENTER
-	btns.add_theme_constant_override("separation", 14)
+	var btns := HFlowContainer.new()
+	btns.alignment = FlowContainer.ALIGNMENT_CENTER
+	btns.add_theme_constant_override("h_separation", 12)
+	btns.add_theme_constant_override("v_separation", 8)
 	root_v.add_child(btns)
 
 	_btn_guide_back = Button.new()
-	_btn_guide_back.custom_minimum_size = Vector2(160, 40)
+	_btn_guide_back.custom_minimum_size = Vector2(150, 40)
+	_btn_guide_back.clip_text = true
 	_style_button(_btn_guide_back, Color("#94A3B8"))
 	_btn_guide_back.pressed.connect(show_settings)
 	btns.add_child(_btn_guide_back)
 
 	_btn_guide_play = Button.new()
-	_btn_guide_play.custom_minimum_size = Vector2(190, 40)
+	_btn_guide_play.custom_minimum_size = Vector2(180, 40)
+	_btn_guide_play.clip_text = true
 	_style_button(_btn_guide_play, Color("#00E5FF"), true)
 	_btn_guide_play.pressed.connect(close_overlays)
 	btns.add_child(_btn_guide_play)
@@ -1067,6 +1211,8 @@ func _build_guide_panel(parent: Control) -> void:
 
 func _make_section_heading(parent: Control) -> Label:
 	var l := Label.new()
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	l.add_theme_font_size_override("font_size", 16)
 	l.add_theme_color_override("font_color", Color("#00E5FF"))
 	parent.add_child(l)
@@ -1076,6 +1222,7 @@ func _make_section_heading(parent: Control) -> Label:
 func _make_body_label(parent: Control) -> Label:
 	var l := Label.new()
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	l.add_theme_color_override("font_color", Color("#CBD5E1"))
 	l.add_theme_font_size_override("font_size", 14)
 	parent.add_child(l)
@@ -1085,15 +1232,20 @@ func _make_body_label(parent: Control) -> Label:
 func _build_levels_panel(parent: Control) -> void:
 	_levels_panel = PanelContainer.new()
 	_levels_panel.custom_minimum_size = Vector2(820, 560)
+	_levels_panel.clip_contents = true
 	_levels_panel.add_theme_stylebox_override("panel", _make_panel_style(Color("#0F172A"), Color("#3B82F6"), 12, 2))
 	parent.add_child(_levels_panel)
 
 	var v := VBoxContainer.new()
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_theme_constant_override("separation", 12)
 	_levels_panel.add_child(v)
 
 	_lbl_levels_title = Label.new()
 	_lbl_levels_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lbl_levels_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_lbl_levels_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_lbl_levels_title.add_theme_font_size_override("font_size", 22)
 	_lbl_levels_title.add_theme_color_override("font_color", Color("#3B82F6"))
 	v.add_child(_lbl_levels_title)
@@ -1108,7 +1260,8 @@ func _build_levels_panel(parent: Control) -> void:
 		var did: String = d_cfg[0]
 		var dcol := Color(d_cfg[1])
 		var db := Button.new()
-		db.custom_minimum_size = Vector2(170, 32)
+		db.custom_minimum_size = Vector2(135, 32)
+		db.clip_text = true
 		_style_button(db, dcol)
 		db.pressed.connect(func(): SettingsManager.set_difficulty(did))
 		l_diff_row.add_child(db)
@@ -1116,12 +1269,16 @@ func _build_levels_panel(parent: Control) -> void:
 
 	_lbl_levels_diff_desc = Label.new()
 	_lbl_levels_diff_desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lbl_levels_diff_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_lbl_levels_diff_desc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_lbl_levels_diff_desc.add_theme_font_size_override("font_size", 12)
 	_lbl_levels_diff_desc.add_theme_color_override("font_color", Color("#94A3B8"))
 	v.add_child(_lbl_levels_diff_desc)
 
 	var scroll := ScrollContainer.new()
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	v.add_child(scroll)
 
 	_levels_grid = GridContainer.new()
@@ -1145,32 +1302,39 @@ func _build_levels_panel(parent: Control) -> void:
 func _build_result_panel(parent: Control) -> void:
 	_result_panel = PanelContainer.new()
 	_result_panel.custom_minimum_size = Vector2(460, 220)
+	_result_panel.clip_contents = true
 	_result_panel.add_theme_stylebox_override("panel", _make_panel_style(Color("#0F172A"), Color("#00E5FF"), 12, 2))
 	parent.add_child(_result_panel)
 
 	var v := VBoxContainer.new()
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_theme_constant_override("separation", 14)
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	_result_panel.add_child(v)
 
 	_lbl_result_title = Label.new()
 	_lbl_result_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lbl_result_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_lbl_result_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_lbl_result_title.add_theme_font_size_override("font_size", 26)
 	v.add_child(_lbl_result_title)
 
 	_lbl_result_body = Label.new()
 	_lbl_result_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_lbl_result_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_lbl_result_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_lbl_result_body.add_theme_color_override("font_color", Color("#CBD5E1"))
 	v.add_child(_lbl_result_body)
 
-	var btns := HBoxContainer.new()
-	btns.alignment = BoxContainer.ALIGNMENT_CENTER
-	btns.add_theme_constant_override("separation", 14)
+	var btns := HFlowContainer.new()
+	btns.alignment = FlowContainer.ALIGNMENT_CENTER
+	btns.add_theme_constant_override("h_separation", 12)
+	btns.add_theme_constant_override("v_separation", 8)
 	v.add_child(btns)
 
 	_btn_result_retry = Button.new()
-	_btn_result_retry.custom_minimum_size = Vector2(160, 42)
+	_btn_result_retry.custom_minimum_size = Vector2(150, 42)
+	_btn_result_retry.clip_text = true
 	_style_button(_btn_result_retry, Color("#F97316"), true)
 	_btn_result_retry.pressed.connect(func():
 		close_overlays()
@@ -1179,7 +1343,8 @@ func _build_result_panel(parent: Control) -> void:
 	btns.add_child(_btn_result_retry)
 
 	_btn_result_next = Button.new()
-	_btn_result_next.custom_minimum_size = Vector2(170, 42)
+	_btn_result_next.custom_minimum_size = Vector2(160, 42)
+	_btn_result_next.clip_text = true
 	_style_button(_btn_result_next, Color("#10B981"), true)
 	_btn_result_next.pressed.connect(func():
 		close_overlays()
@@ -1191,16 +1356,20 @@ func _build_result_panel(parent: Control) -> void:
 func _build_confirm_reset_panel(parent: Control) -> void:
 	_confirm_reset_panel = PanelContainer.new()
 	_confirm_reset_panel.custom_minimum_size = Vector2(480, 240)
+	_confirm_reset_panel.clip_contents = true
 	_confirm_reset_panel.add_theme_stylebox_override("panel", _make_panel_style(Color("#0F172A"), Color("#EF4444"), 12, 2))
 	parent.add_child(_confirm_reset_panel)
 
 	var v := VBoxContainer.new()
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	v.add_theme_constant_override("separation", 14)
 	v.alignment = BoxContainer.ALIGNMENT_CENTER
 	_confirm_reset_panel.add_child(v)
 
 	_lbl_reset_title = Label.new()
 	_lbl_reset_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lbl_reset_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_lbl_reset_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_lbl_reset_title.add_theme_font_size_override("font_size", 24)
 	_lbl_reset_title.add_theme_color_override("font_color", Color("#EF4444"))
 	v.add_child(_lbl_reset_title)
@@ -1208,6 +1377,7 @@ func _build_confirm_reset_panel(parent: Control) -> void:
 	_lbl_reset_body = Label.new()
 	_lbl_reset_body.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_lbl_reset_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_lbl_reset_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_lbl_reset_body.add_theme_color_override("font_color", Color("#E2E8F0"))
 	v.add_child(_lbl_reset_body)
 
@@ -1244,7 +1414,11 @@ func _rebuild_level_buttons() -> void:
 		var done: bool = SettingsManager.is_level_completed(id)
 		var unlocked: bool = SettingsManager.is_level_unlocked(id)
 		var b := Button.new()
-		b.custom_minimum_size = Vector2(175, 62)
+		b.custom_minimum_size = Vector2(125, 62)
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		b.clip_text = true
+		b.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		if unlocked:
 			b.text = "%s%s\n(%d %s)" % [nm, " [OK]" if done else "", w, waves_word]
 			var b_col: Color = Color("#10B981") if done else (Color("#00E5FF") if not bool(lvl.get("has_air", false)) else Color("#F97316"))
@@ -1274,6 +1448,9 @@ func _sync_settings_controls() -> void:
 	for code in _lang_buttons:
 		var b: Button = _lang_buttons[code]
 		_style_button(b, Color("#00E5FF"), code == SettingsManager.language)
+	for code in _guide_lang_buttons:
+		var gb: Button = _guide_lang_buttons[code]
+		_style_button(gb, Color("#00E5FF"), code == SettingsManager.language)
 
 	var spd_unlocked: bool = SettingsManager.is_fast_speed_unlocked()
 	for i in _speed_buttons.size():
@@ -1317,6 +1494,8 @@ func _apply_translations() -> void:
 	set_wave_button_active(_wave_active)
 
 	_lbl_guide_title.text = SettingsManager.tr_key("guide_title")
+	_lbl_welcome_title.text = SettingsManager.tr_key("guide_welcome_title")
+	_lbl_welcome_body.text = SettingsManager.tr_key("guide_welcome_body")
 	_lbl_goal_t.text = SettingsManager.tr_key("guide_goal_title")
 	_lbl_goal_b.text = SettingsManager.tr_key("guide_goal_body")
 	_lbl_maze_t.text = SettingsManager.tr_key("guide_maze_title")
@@ -1326,8 +1505,11 @@ func _apply_translations() -> void:
 		_tile_labels[key].text = SettingsManager.tr_key(key)
 	_lbl_ctrl_t.text = SettingsManager.tr_key("guide_controls_title")
 	_lbl_ctrl_b.text = SettingsManager.tr_key("guide_controls_body")
-	_btn_guide_back.text = SettingsManager.tr_key("btn_back")
-	_btn_guide_play.text = SettingsManager.tr_key("btn_resume") if _has_started else SettingsManager.tr_key("btn_play")
+	_btn_guide_back.text = SettingsManager.tr_key("btn_settings")
+	if not SettingsManager.intro_seen and not _has_started:
+		_btn_guide_play.text = SettingsManager.tr_key("btn_start_playing")
+	else:
+		_btn_guide_play.text = SettingsManager.tr_key("btn_resume") if _has_started else SettingsManager.tr_key("btn_play")
 
 	_lbl_levels_title.text = SettingsManager.tr_key("levels_title")
 	_btn_levels_back.text = SettingsManager.tr_key("btn_back")
@@ -1372,29 +1554,62 @@ func _on_viewport_resized() -> void:
 	var vp: Vector2 = get_viewport().get_visible_rect().size
 	if vp.x <= 1.0 or vp.y <= 1.0:
 		return
-	var pad: float = 28.0
+	var pad: float = 24.0
+	var max_w: float = maxf(280.0, vp.x - pad)
+	var max_h: float = maxf(240.0, vp.y - pad)
 	if _settings_panel:
-		_settings_panel.custom_minimum_size = Vector2(minf(780.0, vp.x - pad), minf(600.0, vp.y - pad))
+		_settings_panel.custom_minimum_size = Vector2(minf(780.0, max_w), minf(600.0, max_h))
 	if _guide_panel:
-		_guide_panel.custom_minimum_size = Vector2(minf(800.0, vp.x - pad), minf(600.0, vp.y - pad))
+		_guide_panel.custom_minimum_size = Vector2(minf(800.0, max_w), minf(620.0, max_h))
 	if _levels_panel:
-		_levels_panel.custom_minimum_size = Vector2(minf(840.0, vp.x - pad), minf(580.0, vp.y - pad))
-	if _levels_grid:
-		_levels_grid.columns = 4 if vp.x >= 780.0 else (3 if vp.x >= 560.0 else 2)
+		var lp_w: float = minf(840.0, max_w)
+		_levels_panel.custom_minimum_size = Vector2(lp_w, minf(580.0, max_h))
+		if _levels_grid:
+			var inner_w: float = maxf(140.0, lp_w - 48.0)
+			_levels_grid.columns = clampi(int(floor((inner_w + 10.0) / 155.0)), 1, 4)
 	if _result_panel:
-		_result_panel.custom_minimum_size = Vector2(minf(460.0, vp.x - pad), minf(220.0, vp.y - pad))
+		_result_panel.custom_minimum_size = Vector2(minf(460.0, max_w), minf(220.0, max_h))
 	if _confirm_reset_panel:
-		_confirm_reset_panel.custom_minimum_size = Vector2(minf(480.0, vp.x - pad), minf(240.0, vp.y - pad))
-	var half_w: float = minf(340.0, (vp.x - 24.0) * 0.5)
+		_confirm_reset_panel.custom_minimum_size = Vector2(minf(480.0, max_w), minf(240.0, max_h))
+
+	var slider_lbl_w: float = 115.0 if vp.x < 560.0 else 175.0
+	for sl in _slider_labels:
+		sl.custom_minimum_size.x = slider_lbl_w
+
+	var bar_half_w: float = minf(360.0, (vp.x - 16.0) * 0.5)
+	var info_w: float = maxf(200.0, bar_half_w * 2.0 - 28.0)
 	if _inspector_panel:
-		_inspector_panel.offset_left = -half_w
-		_inspector_panel.offset_right = half_w
+		_inspector_panel.offset_left = -bar_half_w
+		_inspector_panel.offset_right = bar_half_w
+		if _insp_info_box:
+			_insp_info_box.custom_minimum_size.x = minf(340.0, info_w)
 	if _preview_panel:
-		_preview_panel.offset_left = -half_w
-		_preview_panel.offset_right = half_w
-	if _hud_bar and _status_toast:
-		var bar_h: float = maxf(_hud_bar.size.y, 46.0)
-		_status_toast.offset_top = bar_h + 6.0
-		_status_toast.offset_bottom = bar_h + 32.0
+		_preview_panel.offset_left = -bar_half_w
+		_preview_panel.offset_right = bar_half_w
+		if _prev_info_box:
+			_prev_info_box.custom_minimum_size.x = minf(340.0, info_w)
 	if _hud_btn_guide:
 		_hud_btn_guide.text = "?" if vp.x < 1260.0 else ("? " + SettingsManager.tr_key("btn_how_to_play"))
+	call_deferred("_update_dynamic_bars")
+
+
+func _update_dynamic_bars() -> void:
+	var vp: Vector2 = get_viewport().get_visible_rect().size
+	if vp.x <= 1.0 or vp.y <= 1.0:
+		return
+	if _hud_bar and _status_toast:
+		var bar_h: float = maxf(_hud_bar.size.y, 44.0)
+		var toast_half_w: float = minf(280.0, (vp.x - 20.0) * 0.5)
+		_status_toast.offset_left = -toast_half_w
+		_status_toast.offset_right = toast_half_w
+		_status_toast.offset_top = bar_h + 6.0
+		_status_toast.offset_bottom = bar_h + 6.0
+	if _shop_bar:
+		var shop_h: float = maxf(_shop_bar.size.y, 126.0)
+		var bottom_y: float = -(shop_h + 8.0)
+		if _inspector_panel:
+			_inspector_panel.offset_bottom = bottom_y
+			_inspector_panel.offset_top = bottom_y
+		if _preview_panel:
+			_preview_panel.offset_bottom = bottom_y
+			_preview_panel.offset_top = bottom_y

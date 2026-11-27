@@ -131,7 +131,7 @@ jobs:
           path: builds/macos
 
   build-android:
-    name: Build Android (APK)
+    name: Build Android (APK & AAB)
     runs-on: ubuntu-latest
     container:
       image: barichello/godot-ci:4.3
@@ -139,24 +139,49 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Prepare debug keystore
+      - name: Prepare debug keystore & Android build template
         run: |
           export HOME=/root
-          mkdir -p builds/android
+          mkdir -p builds/android android/build
           if [ ! -f /root/debug.keystore ]; then
             keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android \
               -keystore /root/debug.keystore -storepass android \
               -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
           fi
           sed -i 's|keystore/debug=""|keystore/debug="/root/debug.keystore"|g' export_presets.cfg
+          sed -i 's|keystore/release=""|keystore/release="/root/debug.keystore"|g' export_presets.cfg
+          sed -i 's|keystore/release_user=""|keystore/release_user="androiddebugkey"|g' export_presets.cfg
+          sed -i 's|keystore/release_password=""|keystore/release_password="android"|g' export_presets.cfg
+          TEMPLATE_DIR="/root/.local/share/godot/export_templates/4.3.stable"
+          if [ -f "$TEMPLATE_DIR/android_source.zip" ]; then
+            unzip -q -o "$TEMPLATE_DIR/android_source.zip" -d android/build
+            echo "4.3.stable" > android/.build_version
+            touch android/build/.gdignore
+          fi
+          SDK_DIR="${ANDROID_HOME:-/usr/lib/android-sdk}"
+          mkdir -p /root/.config/godot
+          cat > /root/.config/godot/editor_settings-4.3.tres <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "$SDK_DIR"
+          export/android/debug_keystore = "/root/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          EOF
+          if command -v sdkmanager >/dev/null 2>&1; then
+            yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          fi
 
       - name: Pre-heat project (.godot import cache)
         run: HOME=/root godot --headless --import --quit || true
 
-      - name: Export Android Debug APK
-        run: HOME=/root godot --headless --verbose --export-debug "Android" builds/android/NeonGridDefense.apk
+      - name: Export Android Debug APK & Release AAB
+        run: |
+          HOME=/root godot --headless --verbose --export-debug "Android" builds/android/NeonGridDefense.apk
+          HOME=/root godot --headless --verbose --export-release "Android AAB" builds/android/NeonGridDefense.aab
 
-      - name: Upload Android artifact
+      - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
         with:
           name: neon-grid-defense-android
@@ -188,4 +213,5 @@ jobs:
             release-artifacts/NeonGridDefense-Linux-x86_64.zip
             release-artifacts/neon-grid-defense-macos/NeonGridDefense-macOS.zip
             release-artifacts/neon-grid-defense-android/NeonGridDefense.apk
+            release-artifacts/neon-grid-defense-android/NeonGridDefense.aab
           generate_release_notes: true

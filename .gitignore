@@ -4,6 +4,7 @@
 
 # Build outputs
 builds/
+android/
 *.apk
 *.aab
 *.exe

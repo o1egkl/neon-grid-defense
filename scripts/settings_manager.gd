@@ -25,6 +25,7 @@ var show_grid_lines: bool = true
 var default_speed: int = 1
 var difficulty: String = "easy"
 var completed_levels: Array = []
+var intro_seen: bool = false
 
 
 func _ready() -> void:
@@ -135,8 +136,15 @@ func mark_level_completed(level_id: int) -> void:
 func reset_progress() -> void:
 	completed_levels.clear()
 	default_speed = 1
+	intro_seen = false
 	save_settings()
 	settings_changed.emit()
+
+
+func mark_intro_seen() -> void:
+	if not intro_seen:
+		intro_seen = true
+		save_settings()
 
 
 func set_default_speed(val: int) -> void:
@@ -186,7 +194,8 @@ func save_settings() -> void:
 		"show_grid_lines": show_grid_lines,
 		"default_speed": default_speed,
 		"difficulty": difficulty,
-		"completed_levels": completed_levels
+		"completed_levels": completed_levels,
+		"intro_seen": intro_seen
 	}
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file:
@@ -228,3 +237,4 @@ func _load_settings() -> void:
 				completed_levels.append(iv)
 	if not is_fast_speed_unlocked():
 		default_speed = 1
+	intro_seen = bool(parsed.get("intro_seen", false))
